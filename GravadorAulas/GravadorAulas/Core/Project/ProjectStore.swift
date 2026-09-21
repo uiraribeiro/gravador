@@ -39,7 +39,7 @@ final class ProjectStore {
 
     func save(_ project: Project) throws -> URL {
         let dir = defaultProjectsDirectory()
-        let url = dir.appendingPathComponent("\(safe(name: project.name)).gaulasproj.json")
+        let url = dir.appendingPathComponent("\(safe(name: project.name))-\(project.id.uuidString).gaulasproj.json")
         let data = try encoder.encode(project)
         try data.write(to: url, options: .atomic)
         AppLog.editor.info("projeto salvo: \(url.path, privacy: .public)")

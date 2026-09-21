@@ -44,6 +44,7 @@ final class Compositor {
 
     /// Compõe os segmentos em um único AVMutableComposition.
     func compose(result: RecordingResult,
+                 project: Project? = nil,
                  screenSize: CGSize?,
                  cameraOverlay: CameraOverlayConfig,
                  includeCamera: Bool,
@@ -51,7 +52,21 @@ final class Compositor {
                  systemVolume: Float = 0.7,
                  frameRate: Int = 30) async throws -> CompositionResult {
 
-        guard !result.screen.isEmpty else {
+        let screenClips = project?.timeline.track(.screen)?.clips ?? result.screen.map {
+            Clip(id: UUID(), assetURL: $0.url, sourceStart: 0,
+                 sourceDuration: $0.duration, timelineStart: $0.timelineStart)
+        }
+        let cameraClips = project?.timeline.track(.camera)?.clips ?? result.camera.map {
+            Clip(id: UUID(), assetURL: $0.url, sourceStart: 0,
+                 sourceDuration: $0.duration, timelineStart: $0.timelineStart)
+        }
+        let micClips = project?.timeline.track(.microphone)?.clips ?? result.mic.map {
+            Clip(id: UUID(), assetURL: $0.url, sourceStart: 0,
+                 sourceDuration: $0.duration, timelineStart: $0.timelineStart)
+        }
+        let systemClips = (project?.timeline.track(.systemAudio)?.clips.isEmpty == false)
+            ? (project?.timeline.track(.systemAudio)?.clips ?? []) : screenClips
+        guard !screenClips.isEmpty else {
             throw CompositorError.noSegments
         }
 
@@ -72,94 +87,110 @@ final class Compositor {
         let sysAudioTrack = composition.addMutableTrack(withMediaType: .audio,
                                                        preferredTrackID: kCMPersistentTrackID_Invalid)!
 
-        var cursor: CMTime = .zero
-        for seg in result.screen {
+        var totalDuration: CMTime = .zero
+        for clip in screenClips.sorted(by: { $0.timelineStart < $1.timelineStart }) {
             // Verifica se o arquivo existe antes de tentar ler — protege
             // contra segmentos vazios que travariam o AVURLAsset.load.
-            guard FileManager.default.fileExists(atPath: seg.url.path) else {
-                AppLog.export.warning("segmento de tela ausente: \(seg.url.lastPathComponent, privacy: .public)")
+            guard FileManager.default.fileExists(atPath: clip.assetURL.path) else {
+                AppLog.export.warning("segmento de tela ausente: \(clip.assetURL.lastPathComponent, privacy: .public)")
                 continue
             }
-            let asset = AVURLAsset(url: seg.url)
+            let asset = AVURLAsset(url: clip.assetURL)
             do {
                 let tracks = try await asset.load(.tracks)
                 guard let v = tracks.first(where: { $0.mediaType == .video }) else {
-                    AppLog.export.warning("sem vídeo em \(seg.url.lastPathComponent, privacy: .public)")
+                    AppLog.export.warning("sem vídeo em \(clip.assetURL.lastPathComponent, privacy: .public)")
                     continue
                 }
                 let dur = try await asset.load(.duration)
                 // Pula segmentos com duração ínfima (não dá para compor)
-                guard dur.seconds > 0.05 else {
-                    AppLog.export.warning("segmento \(seg.url.lastPathComponent, privacy: .public) tem \(dur.seconds, privacy: .public)s — pulando")
+                let usable = min(clip.sourceDuration, dur.seconds - clip.sourceStart)
+                guard usable > 0.05 else {
+                    AppLog.export.warning("clipe \(clip.assetURL.lastPathComponent, privacy: .public) sem duração válida — pulando")
                     continue
                 }
-                let range = CMTimeRange(start: .zero, duration: dur)
+                let range = CMTimeRange(
+                    start: CMTime(seconds: clip.sourceStart, preferredTimescale: 600),
+                    duration: CMTime(seconds: usable, preferredTimescale: 600))
+                let position = CMTime(seconds: clip.timelineStart, preferredTimescale: 600)
 
                 // Vídeo
-                try screenVideoTrack.insertTimeRange(range, of: v, at: cursor)
+                try screenVideoTrack.insertTimeRange(range, of: v, at: position)
 
-                // Áudio do sistema (se houver)
-                if let a = tracks.first(where: { $0.mediaType == .audio }) {
-                    do {
-                        try sysAudioTrack.insertTimeRange(range, of: a, at: cursor)
-                    } catch {
-                        AppLog.export.warning("sem trilha de áudio em \(seg.url.lastPathComponent, privacy: .public)")
-                    }
-                }
-                cursor = CMTimeAdd(cursor, dur)
+                totalDuration = CMTimeMaximum(totalDuration, CMTimeAdd(position, range.duration))
             } catch {
-                AppLog.export.error("falha lendo segmento \(seg.url.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                AppLog.export.error("falha lendo segmento \(clip.assetURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 continue  // pula segmento ruim em vez de travar tudo
             }
         }
-        let totalDuration = cursor
+        guard totalDuration > .zero else { throw CompositorError.noSegments }
+
+        for clip in systemClips.sorted(by: { $0.timelineStart < $1.timelineStart }) {
+            let asset = AVURLAsset(url: clip.assetURL)
+            do {
+                let tracks = try await asset.load(.tracks)
+                guard let audio = tracks.first(where: { $0.mediaType == .audio }) else { continue }
+                let duration = try await asset.load(.duration)
+                let usable = min(clip.sourceDuration, duration.seconds - clip.sourceStart)
+                guard usable > 0.05 else { continue }
+                let range = CMTimeRange(start: CMTime(seconds: clip.sourceStart, preferredTimescale: 600),
+                                        duration: CMTime(seconds: usable, preferredTimescale: 600))
+                try sysAudioTrack.insertTimeRange(range, of: audio,
+                    at: CMTime(seconds: clip.timelineStart, preferredTimescale: 600))
+            } catch {
+                AppLog.export.warning("sem áudio de sistema em \(clip.assetURL.lastPathComponent, privacy: .public)")
+            }
+        }
 
         // --- Trilha de vídeo da câmera (overlay)
         var cameraVideoTrack: AVMutableCompositionTrack? = nil
-        if includeCamera, !result.camera.isEmpty {
+        if includeCamera, !cameraClips.isEmpty {
             cameraVideoTrack = composition.addMutableTrack(withMediaType: .video,
                                                             preferredTrackID: kCMPersistentTrackID_Invalid)!
-            var camCursor: CMTime = .zero
-            for seg in result.camera {
-                let asset = AVURLAsset(url: seg.url)
+            for clip in cameraClips.sorted(by: { $0.timelineStart < $1.timelineStart }) {
+                let asset = AVURLAsset(url: clip.assetURL)
                 do {
                     let tracks = try await asset.load(.tracks)
                     guard let v = tracks.first(where: { $0.mediaType == .video }) else { continue }
                     let dur = try await asset.load(.duration)
-                    let range = CMTimeRange(start: .zero, duration: dur)
-                    try cameraVideoTrack?.insertTimeRange(range, of: v, at: camCursor)
-                    camCursor = CMTimeAdd(camCursor, dur)
+                    let usable = min(clip.sourceDuration, dur.seconds - clip.sourceStart)
+                    guard usable > 0.05 else { continue }
+                    let range = CMTimeRange(start: CMTime(seconds: clip.sourceStart, preferredTimescale: 600),
+                                            duration: CMTime(seconds: usable, preferredTimescale: 600))
+                    try cameraVideoTrack?.insertTimeRange(range, of: v,
+                        at: CMTime(seconds: clip.timelineStart, preferredTimescale: 600))
                 } catch {
-                    AppLog.export.error("falha lendo câmera \(seg.url.lastPathComponent, privacy: .public)")
+                    AppLog.export.error("falha lendo câmera \(clip.assetURL.lastPathComponent, privacy: .public)")
                 }
             }
         }
 
         // --- Trilha de áudio do microfone
         var micAudioTrack: AVMutableCompositionTrack? = nil
-        if !result.mic.isEmpty {
+        if !micClips.isEmpty {
             micAudioTrack = composition.addMutableTrack(withMediaType: .audio,
                                                        preferredTrackID: kCMPersistentTrackID_Invalid)!
-            var micCursor: CMTime = .zero
-            for seg in result.mic {
-                guard FileManager.default.fileExists(atPath: seg.url.path) else {
-                    AppLog.export.warning("segmento de mic ausente: \(seg.url.lastPathComponent, privacy: .public)")
+            for clip in micClips.sorted(by: { $0.timelineStart < $1.timelineStart }) {
+                guard FileManager.default.fileExists(atPath: clip.assetURL.path) else {
+                    AppLog.export.warning("segmento de mic ausente: \(clip.assetURL.lastPathComponent, privacy: .public)")
                     continue
                 }
-                let asset = AVURLAsset(url: seg.url)
+                let asset = AVURLAsset(url: clip.assetURL)
                 do {
                     let tracks = try await asset.load(.tracks)
                     guard let a = tracks.first(where: { $0.mediaType == .audio }) else {
-                        AppLog.export.warning("sem áudio em \(seg.url.lastPathComponent, privacy: .public)")
+                        AppLog.export.warning("sem áudio em \(clip.assetURL.lastPathComponent, privacy: .public)")
                         continue
                     }
                     let dur = try await asset.load(.duration)
-                    guard dur.seconds > 0.05 else { continue }
-                    let range = CMTimeRange(start: .zero, duration: dur)
-                    try micAudioTrack?.insertTimeRange(range, of: a, at: micCursor)
-                    micCursor = CMTimeAdd(micCursor, dur)
+                    let usable = min(clip.sourceDuration, dur.seconds - clip.sourceStart)
+                    guard usable > 0.05 else { continue }
+                    let range = CMTimeRange(start: CMTime(seconds: clip.sourceStart, preferredTimescale: 600),
+                                            duration: CMTime(seconds: usable, preferredTimescale: 600))
+                    try micAudioTrack?.insertTimeRange(range, of: a,
+                        at: CMTime(seconds: clip.timelineStart, preferredTimescale: 600))
                 } catch {
-                    AppLog.export.error("falha lendo mic \(seg.url.lastPathComponent, privacy: .public)")
+                    AppLog.export.error("falha lendo mic \(clip.assetURL.lastPathComponent, privacy: .public)")
                     continue
                 }
             }
@@ -185,6 +216,7 @@ final class Compositor {
         let fillScale = max(scaleX, scaleY)
         let screenScaleTransform = CGAffineTransform(scaleX: fillScale, y: fillScale)
         screenTransform.setTransform(screenScaleTransform, at: .zero)
+        applyVideoFades(from: screenClips, to: screenTransform)
 
         var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = [screenTransform]
 
@@ -200,6 +232,7 @@ final class Compositor {
                                     .scaledBy(x: overlayW / renderSize.width,
                                               y: overlayH / renderSize.height),
                                   at: .zero)
+            applyVideoFades(from: cameraClips, to: layerCam)
             layerInstructions.append(layerCam)
         }
 
@@ -211,12 +244,16 @@ final class Compositor {
         var mixParams: [AVMutableAudioMixInputParameters] = []
         if let sys = composition.tracks(withMediaType: .audio).first {
             let p = AVMutableAudioMixInputParameters(track: sys)
-            p.setVolume(systemVolume, at: .zero)
+            let volume: Float = project?.timeline.track(.systemAudio)?.muted == true ? 0 : systemVolume
+            p.setVolume(volume, at: .zero)
+            applyAudioFades(from: systemClips, volume: volume, to: p)
             mixParams.append(p)
         }
         if let mic = micAudioTrack {
             let p = AVMutableAudioMixInputParameters(track: mic)
-            p.setVolume(micVolume, at: .zero)
+            let volume: Float = project?.timeline.track(.microphone)?.muted == true ? 0 : micVolume
+            p.setVolume(volume, at: .zero)
+            applyAudioFades(from: micClips, volume: volume, to: p)
             mixParams.append(p)
         }
         if !mixParams.isEmpty {
@@ -230,6 +267,35 @@ final class Compositor {
             renderSize: renderSize,
             duration: totalDuration
         )
+    }
+
+    private func applyVideoFades(from clips: [Clip], to layer: AVMutableVideoCompositionLayerInstruction) {
+        for clip in clips {
+            for effect in clip.effects where effect.duration > 0 {
+                let range = CMTimeRange(start: CMTime(seconds: effect.start, preferredTimescale: 600),
+                    duration: CMTime(seconds: effect.duration, preferredTimescale: 600))
+                switch effect.kind {
+                case .fadeIn: layer.setOpacityRamp(fromStartOpacity: 0, toEndOpacity: 1, timeRange: range)
+                case .fadeOut: layer.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: range)
+                default: break
+                }
+            }
+        }
+    }
+
+    private func applyAudioFades(from clips: [Clip], volume: Float,
+                                 to parameters: AVMutableAudioMixInputParameters) {
+        for clip in clips {
+            for effect in clip.effects where effect.duration > 0 {
+                let range = CMTimeRange(start: CMTime(seconds: effect.start, preferredTimescale: 600),
+                    duration: CMTime(seconds: effect.duration, preferredTimescale: 600))
+                switch effect.kind {
+                case .fadeIn: parameters.setVolumeRamp(fromStartVolume: 0, toEndVolume: volume, timeRange: range)
+                case .fadeOut: parameters.setVolumeRamp(fromStartVolume: volume, toEndVolume: 0, timeRange: range)
+                default: break
+                }
+            }
+        }
     }
 
     private func firstVideoSize(segments: [SegmentRef]) async throws -> CGSize? {

@@ -51,7 +51,8 @@ struct Project: Codable, Equatable {
     var timeline: Timeline
     var chapters: [Chapter]
     var privacyRegions: [PrivacyRegion]
-    var removedRanges: [RemovedRange] = []
+    var removedRanges: [RemovedRange]? = []
+    var transcriptionSegments: [TranscriptionSegment]? = nil
     var introOutroTemplate: IntroOutroTemplate?
 
     static func empty(name: String) -> Project {
@@ -65,6 +66,7 @@ struct Project: Codable, Equatable {
             chapters: [],
             privacyRegions: [],
             removedRanges: [],
+            transcriptionSegments: nil,
             introOutroTemplate: nil
         )
     }

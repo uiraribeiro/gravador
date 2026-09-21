@@ -15,6 +15,7 @@ import AVFoundation
 struct TranscriptionPanelView: View {
     @EnvironmentObject var env: AppEnvironment
     @StateObject private var transcriber = Transcriber()
+    @State private var preparationError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -50,11 +51,21 @@ struct TranscriptionPanelView: View {
                     .font(.caption).foregroundStyle(.red)
                     .padding(.horizontal)
             }
+            if let preparationError {
+                Text(preparationError).font(.caption).foregroundStyle(.red)
+                    .padding(.horizontal)
+            }
 
             Spacer()
         }
         .padding(.vertical, 8)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.4))
+        .onAppear {
+            if let saved = env.currentProject?.transcriptionSegments, !saved.isEmpty,
+               transcriber.segments.isEmpty {
+                transcriber.loadSegments(saved)
+            }
+        }
     }
 
     private var controls: some View {
@@ -73,6 +84,14 @@ struct TranscriptionPanelView: View {
                 Label("Detectar fillers e silêncios", systemImage: "wand.and.stars")
             }
             .disabled(transcriber.segments.isEmpty)
+            .controlSize(.small)
+
+            Button {
+                applyAllSilences()
+            } label: {
+                Label("Remover silêncios", systemImage: "speaker.slash")
+            }
+            .disabled(!transcriber.suggestions.contains(where: { $0.kind == .silence }))
             .controlSize(.small)
 
             Button {
@@ -136,41 +155,93 @@ struct TranscriptionPanelView: View {
 
     private func transcribeRecording() async {
         guard let result = env.lastRecordingResult else { return }
-        if let firstMic = result.mic.first {
-            await transcriber.transcribe(audioURL: firstMic.url)
-        } else if let firstScreen = result.screen.first {
-            // Fallback: usa áudio da tela se não houver trilha de mic
-            await transcriber.transcribe(audioURL: firstScreen.url)
+        preparationError = nil
+        let sources = result.mic.isEmpty ? result.screen : result.mic
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(withMediaType: .audio,
+            preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
+        do {
+            for segment in sources {
+                let asset = AVURLAsset(url: segment.url)
+                let tracks = try await asset.load(.tracks)
+                guard let audio = tracks.first(where: { $0.mediaType == .audio }) else { continue }
+                let duration = try await asset.load(.duration)
+                try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration),
+                    of: audio, at: CMTime(seconds: segment.timelineStart, preferredTimescale: 600))
+            }
+            guard !track.segments.isEmpty else {
+                preparationError = "A gravação não contém áudio para transcrever."
+                return
+            }
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("transcricao-\(UUID().uuidString).m4a")
+            guard let session = AVAssetExportSession(asset: composition,
+                presetName: AVAssetExportPresetAppleM4A) else {
+                preparationError = "Não foi possível preparar o áudio para transcrição."
+                return
+            }
+            session.outputURL = url
+            session.outputFileType = .m4a
+            await session.export()
+            guard session.status == .completed else {
+                preparationError = session.error?.localizedDescription ?? "Falha preparando áudio."
+                return
+            }
+            await transcriber.transcribe(audioURL: url)
+            try? FileManager.default.removeItem(at: url)
+            saveTranscription()
+        } catch {
+            preparationError = error.localizedDescription
         }
     }
 
     private func analyze() async {
         transcriber.analyzeForEditing(minSilenceSeconds: 0.6)
+        saveTranscription()
+    }
+
+    private func saveTranscription() {
+        guard transcriber.state == .finished, var project = env.currentProject else { return }
+        project.transcriptionSegments = transcriber.segments
+        project.modifiedAt = .now
+        env.currentProject = project
     }
 
     private func applySuggestion(_ sug: CutSuggestion) {
         guard var project = env.currentProject else { return }
-        // Cria uma região de privacidade do tipo .solidBar com duração = gap,
-        // o que efetivamente marca o trecho. Implementação completa do corte
-        // (remoção + recomposição) fica para a Etapa 2. Por ora, aplicamos
-        // o trecho como uma marca visual que será renderizada no export.
-        project.timeline.tracks = project.timeline.tracks.map { track in
-            var t = track
-            // Só marca em tracks de áudio (mic / sistema) ou na tela.
-            if [.microphone, .systemAudio, .screen].contains(track.kind) {
-                t.clips.append(Clip(
-                    id: UUID(),
-                    assetURL: t.clips.first?.assetURL ?? URL(fileURLWithPath: "/dev/null"),
-                    sourceStart: sug.start,
-                    sourceDuration: sug.duration,
-                    timelineStart: sug.start,
-                    effects: [EffectDescriptor(kind: .solidBar, start: sug.start, duration: sug.duration)]
-                ))
-            }
-            return t
-        }
+        guard sug.start >= 0, sug.end > sug.start,
+              sug.end <= project.timeline.duration else { return }
+        project.removedRanges = mergedRanges((project.removedRanges ?? []) +
+            [RemovedRange(start: sug.start, end: sug.end)])
         project.modifiedAt = .now
         env.currentProject = project
+        transcriber.removeSuggestion(id: sug.id)
+    }
+
+    private func applyAllSilences() {
+        guard var project = env.currentProject else { return }
+        let candidates = transcriber.suggestions.filter {
+            $0.kind == .silence && $0.start >= 0 && $0.end > $0.start
+                && $0.end <= project.timeline.duration
+        }
+        guard !candidates.isEmpty else { return }
+        project.removedRanges = mergedRanges((project.removedRanges ?? []) +
+            candidates.map { RemovedRange(start: $0.start, end: $0.end) })
+        project.modifiedAt = .now
+        env.currentProject = project
+        for suggestion in candidates { transcriber.removeSuggestion(id: suggestion.id) }
+    }
+
+    private func mergedRanges(_ ranges: [RemovedRange]) -> [RemovedRange] {
+        var result: [RemovedRange] = []
+        for range in ranges.sorted(by: { $0.start < $1.start }) {
+            if let last = result.last, range.start <= last.end {
+                result[result.count - 1].end = max(last.end, range.end)
+            } else {
+                result.append(range)
+            }
+        }
+        return result
     }
 
     private func exportSRT() {

@@ -52,6 +52,7 @@ final class Exporter: ObservableObject {
             let comp = Compositor()
             let composed = try await comp.compose(
                 result: result,
+                project: project,
                 screenSize: CGSize(width: preset.width, height: preset.height),
                 cameraOverlay: cameraOverlay,
                 includeCamera: includeCamera && !cameraOverlay.hidden,
@@ -59,6 +60,31 @@ final class Exporter: ObservableObject {
                 systemVolume: systemVolume,
                 frameRate: preset.frameRate
             )
+
+            // Remove os mesmos intervalos de todas as trilhas da composição.
+            // Processar de trás para frente preserva as posições originais.
+            let duration = composed.duration.seconds
+            let ranges = (project?.removedRanges ?? [])
+                .filter { $0.start >= 0 && $0.end > $0.start && $0.end <= duration }
+                .sorted { $0.start < $1.start }
+            var merged: [(Double, Double)] = []
+            for range in ranges {
+                if let last = merged.last, range.start <= last.1 {
+                    merged[merged.count - 1].1 = max(last.1, range.end)
+                } else {
+                    merged.append((range.start, range.end))
+                }
+            }
+            for (start, end) in merged.reversed() {
+                let timeRange = CMTimeRange(
+                    start: CMTime(seconds: start, preferredTimescale: 600),
+                    duration: CMTime(seconds: end - start, preferredTimescale: 600)
+                )
+                composed.composition.removeTimeRange(timeRange)
+            }
+            if let instruction = composed.videoComposition?.instructions.first as? AVMutableVideoCompositionInstruction {
+                instruction.timeRange = CMTimeRange(start: .zero, duration: composed.composition.duration)
+            }
 
             AppLog.export.info("composição pronta: \(composed.duration.seconds, privacy: .public)s @ \(Int(composed.renderSize.width))x\(Int(composed.renderSize.height))")
 
@@ -79,7 +105,6 @@ final class Exporter: ObservableObject {
             session.outputURL = outputURL
             session.outputFileType = .mp4
             session.shouldOptimizeForNetworkUse = true
-            session.videoComposition = composed.videoComposition
             session.audioMix = composed.audioMix
 
             self.exportSession = session
@@ -96,6 +121,11 @@ final class Exporter: ObservableObject {
                 || !allAnnotations.isEmpty
 
             if needsCustomCompositor {
+                let videoTracks = composed.composition.tracks(withMediaType: .video)
+                guard let screenTrack = videoTracks.first else {
+                    status = .failed("Composição sem vídeo de tela")
+                    return
+                }
                 let compositor = GravadorAulasCompositor()
                 compositor.configure(with: CompositorInstructions(
                     renderSize: composed.renderSize,
@@ -105,11 +135,15 @@ final class Exporter: ObservableObject {
                     keyEvents: [],
                     cursorSamples: [],
                     annotations: allAnnotations,
-                    trackKindForInstruction: .screen
+                    trackKindForInstruction: .screen,
+                    screenTrackID: screenTrack.trackID,
+                    cameraTrackID: videoTracks.dropFirst().first?.trackID,
+                    cameraRect: cameraOverlay.normalizedRect
                 ))
                 composed.videoComposition?.customVideoCompositorClass = GravadorAulasCompositor.self
                 self.activeCompositor = compositor
             }
+            session.videoComposition = composed.videoComposition
 
             await session.export()
 

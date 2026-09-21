@@ -39,17 +39,24 @@ final class Transcriber: NSObject, ObservableObject {
         recognizer?.supportsOnDeviceRecognition ?? false
     }
 
+    func loadSegments(_ saved: [TranscriptionSegment]) {
+        segments = saved
+        state = .finished
+    }
+
     /// Executa a transcrição completa sobre o arquivo de áudio.
     func transcribe(audioURL: URL) async {
         guard let recognizer, recognizer.isAvailable else {
             state = .failed("Reconhecedor indisponível")
             return
         }
+        guard recognizer.supportsOnDeviceRecognition else {
+            state = .failed("Transcrição local em português indisponível neste Mac.")
+            return
+        }
         let request = SFSpeechURLRecognitionRequest(url: audioURL)
         request.shouldReportPartialResults = false
-        if recognizer.supportsOnDeviceRecognition {
-            request.requiresOnDeviceRecognition = true
-        }
+        request.requiresOnDeviceRecognition = true
         request.addsPunctuation = true
         request.taskHint = .dictation
 
@@ -101,7 +108,7 @@ final class Transcriber: NSObject, ObservableObject {
 
         // 2) Silêncios entre segmentos consecutivos
         var sugs: [CutSuggestion] = []
-        for i in 0..<withFillers.count - 1 {
+        for i in 0..<max(0, withFillers.count - 1) {
             let end = withFillers[i].end
             let nextStart = withFillers[i + 1].start
             let gap = nextStart - end
@@ -124,6 +131,10 @@ final class Transcriber: NSObject, ObservableObject {
             ))
         }
         self.suggestions = sugs
+    }
+
+    func removeSuggestion(id: UUID) {
+        suggestions.removeAll { $0.id == id }
     }
 
     /// Exporta os segmentos como SRT.
@@ -151,19 +162,11 @@ struct CutSuggestion: Identifiable, Equatable {
 // MARK: - Detector de fillers
 
 enum FillerDetector {
-    static let patterns = [
-        "é...", "eh...", "ée", "éé",
-        "ah...", "ah", "áh",
-        "hum...", "uhm...", "hm...",
-        "tipo...", "tipo",
-        "né...", "né", "naquele...",
-        "tipo assim", "sei lá",
-        "então...", "então",
-    ]
+    static let patterns: Set<String> = ["eh", "ahn", "ah", "hum", "uhm", "hm", "ãh"]
 
     static func classify(_ text: String) -> Bool {
-        let lower = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        return patterns.contains { lower.contains($0) }
+        let lower = text.lowercased().trimmingCharacters(in: .punctuationCharacters.union(.whitespacesAndNewlines))
+        return patterns.contains(lower)
     }
 
     static func detect(in segments: [TranscriptionSegment]) -> [TranscriptionSegment] {

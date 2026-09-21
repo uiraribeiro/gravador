@@ -105,8 +105,11 @@ final class RecordingSession: NSObject, ObservableObject {
 
     init(config: SourceConfig) {
         self.sourceConfig = config
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("GravadorAulas/rec-\(UUID().uuidString.prefix(8))")
+        let movies = (try? FileManager.default.url(for: .moviesDirectory,
+            in: .userDomainMask, appropriateFor: nil, create: true))
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies")
+        let dir = movies.appendingPathComponent(
+            "GravadorAulas/Gravacoes/rec-\(UUID().uuidString.prefix(8))")
         self.sessionDir = dir
         super.init()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -117,6 +120,7 @@ final class RecordingSession: NSObject, ObservableObject {
     }
 
     var outputDirectory: URL { sessionDir }
+    var cameraPreviewLayer: AVCaptureVideoPreviewLayer { camera.previewLayer }
 
     func attachPreview(view: ScreenBufferView) {
         self.previewView = view
@@ -153,6 +157,7 @@ final class RecordingSession: NSObject, ObservableObject {
         if let cam = sourceConfig.camera {
             do {
                 try camera.prepare(deviceRef: cam)
+                camera.start()
             } catch {
                 throw RecordingError.deviceUnavailable("webcam — \(error.localizedDescription)")
             }
@@ -160,6 +165,10 @@ final class RecordingSession: NSObject, ObservableObject {
 
         state = .ready
         AppLog.recorder.info("sessão pronta")
+    }
+
+    func stopPreviewIfIdle() {
+        if state == .ready || state == .idle { camera.stop() }
     }
 
     // MARK: Início
@@ -218,6 +227,11 @@ final class RecordingSession: NSObject, ObservableObject {
 
     func pause() {
         guard state == .recording else { return }
+        if let lastResumeAt {
+            timelinePosition += max(0, Date.now.timeIntervalSince(lastResumeAt))
+        }
+        lastResumeAt = nil
+        elapsed = timelinePosition
         state = .paused
         stopTimer()
         Task {
@@ -259,6 +273,11 @@ final class RecordingSession: NSObject, ObservableObject {
                                    timelineDuration: timelinePosition,
                                    outputDirectory: sessionDir)
         }
+        if state == .recording, let lastResumeAt {
+            timelinePosition += max(0, Date.now.timeIntervalSince(lastResumeAt))
+        }
+        lastResumeAt = nil
+        elapsed = timelinePosition
         state = .stopping
         stopTimer()
         await screen.stop()
@@ -271,7 +290,8 @@ final class RecordingSession: NSObject, ObservableObject {
             camera: segmentsCamera,
             mic:   segmentsMic,
             sysAudioIncludedInScreen: sourceConfig.captureSystemAudio,
-            timelineDuration: timelinePosition,
+            timelineDuration: max(timelinePosition,
+                segmentsScreen.map { $0.timelineStart + $0.duration }.max() ?? 0),
             outputDirectory: sessionDir
         )
         state = .idle
@@ -613,10 +633,6 @@ final class SegmentWriter: @unchecked Sendable {
                 }
                 self.audioSampleCount += 1
             }
-            } else {
-                if self.firstAudioPTS == nil { self.firstAudioPTS = samplePTS }
-            }
-
             // Inicia a sessão no PTS mais cedo entre as trilhas que já vimos.
             // O AVAssetWriter interpreta isso como o início do arquivo:
             // samples com PTS >= startTime são gravados normalmente; samples

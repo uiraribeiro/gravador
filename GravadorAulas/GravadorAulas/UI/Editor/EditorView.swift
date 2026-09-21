@@ -15,6 +15,7 @@ import SwiftUI
 import AVKit
 import AVFoundation
 import Combine
+import UniformTypeIdentifiers
 
 struct EditorView: View {
     @EnvironmentObject var env: AppEnvironment
@@ -25,11 +26,14 @@ struct EditorView: View {
     @State private var showTranscriptionPanel = false
     @State private var showChaptersPanel = false
     @State private var showPrivacyPanel = false
+    @State private var privacyDraftRect = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.15)
 
     // Edição
     @State private var selectedClipKey: String? = nil    // "trackKind:clipId"
     @State private var inspectorClip: Clip? = nil         // clipe selecionado para o sheet
     @State private var playhead: Double = 0               // segundos
+    @State private var undoStack: [Project] = []
+    @State private var redoStack: [Project] = []
 
     var body: some View {
         HSplitView {
@@ -53,6 +57,20 @@ struct EditorView: View {
                 .disabled(env.currentProject == nil)
 
                 Button {
+                    Task { await importVideo() }
+                } label: {
+                    Label("Importar vídeo", systemImage: "film")
+                }
+                .disabled(env.currentProject == nil || env.lastRecordingResult == nil)
+
+                Button {
+                    importImage()
+                } label: {
+                    Label("Importar imagem", systemImage: "photo.badge.plus")
+                }
+                .disabled(env.currentProject == nil || env.lastRecordingResult == nil)
+
+                Button {
                     revealRecordingInFinder()
                 } label: {
                     Label("Mostrar gravações no Finder", systemImage: "folder")
@@ -60,6 +78,18 @@ struct EditorView: View {
                 .disabled(env.lastRecordingResult?.outputDirectory == nil)
 
                 Divider()
+
+                Button { undoEdit() } label: {
+                    Label("Desfazer", systemImage: "arrow.uturn.backward")
+                }
+                .disabled(undoStack.isEmpty)
+                .keyboardShortcut("z", modifiers: [.command])
+
+                Button { redoEdit() } label: {
+                    Label("Refazer", systemImage: "arrow.uturn.forward")
+                }
+                .disabled(redoStack.isEmpty)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
 
                 Button {
                     selectedClipKey = nil
@@ -93,8 +123,14 @@ struct EditorView: View {
         VStack(spacing: 0) {
             ZStack {
                 if let player {
-                    VideoPlayer(player: player)
-                        .aspectRatio(16/9, contentMode: .fit)
+                    ZStack {
+                        NativePlayerView(player: player)
+                        if showPrivacyPanel {
+                            PrivacySelectionOverlay(rect: $privacyDraftRect,
+                                regions: env.currentProject?.privacyRegions ?? [])
+                        }
+                    }
+                    .aspectRatio(16/9, contentMode: .fit)
                 } else {
                     placeholderPreview
                 }
@@ -260,7 +296,7 @@ struct EditorView: View {
             }
             .padding(.horizontal)
 
-            Text("Dica: arraste na régua acima para mover o playhead. Edição completa (trim preciso, split, anotações, cursor) na Etapa 2.")
+            Text("Dica: arraste na régua para mover o playhead. Selecione um clipe para ajustar o início, o fim ou dividir no playhead.")
                 .font(.caption2).foregroundStyle(.secondary)
                 .padding(.horizontal)
         }
@@ -376,7 +412,7 @@ struct EditorView: View {
                 ChaptersPanelView().frame(minHeight: 200)
             }
             if showPrivacyPanel {
-                PrivacyRegionsView().frame(minHeight: 200)
+                PrivacyRegionsView(draftRect: $privacyDraftRect).frame(minHeight: 200)
             }
 
             Spacer()
@@ -393,6 +429,8 @@ struct EditorView: View {
         case addFadeIn(Double)
         case addFadeOut(Double)
         case splitAtPlayhead
+        case trimStart(Double)
+        case trimEnd(Double)
     }
 
     private func applyEdit(_ action: EditAction, to clip: Clip) {
@@ -432,9 +470,33 @@ struct EditorView: View {
 
         case .splitAtPlayhead:
             splitClip(clip, at: playhead, in: &project)
+
+        case .trimStart(let amount):
+            for i in project.timeline.tracks.indices {
+                if let j = project.timeline.tracks[i].clips.firstIndex(where: { $0.id == clip.id }) {
+                    let current = project.timeline.tracks[i].clips[j]
+                    let n = max(0, min(amount, current.sourceDuration - 0.05))
+                    project.timeline.tracks[i].clips[j].sourceStart += n
+                    project.timeline.tracks[i].clips[j].sourceDuration -= n
+                    project.timeline.tracks[i].clips[j].timelineStart += n
+                    break
+                }
+            }
+
+        case .trimEnd(let amount):
+            for i in project.timeline.tracks.indices {
+                if let j = project.timeline.tracks[i].clips.firstIndex(where: { $0.id == clip.id }) {
+                    let current = project.timeline.tracks[i].clips[j]
+                    let n = max(0, min(amount, current.sourceDuration - 0.05))
+                    project.timeline.tracks[i].clips[j].sourceDuration -= n
+                    break
+                }
+            }
         }
 
         project.modifiedAt = .now
+        undoStack.append(env.currentProject!)
+        redoStack.removeAll()
         env.currentProject = project
         AppLog.editor.info("edit aplicado: \(String(describing: action), privacy: .public)")
     }
@@ -446,7 +508,11 @@ struct EditorView: View {
         for i in project.timeline.tracks.indices {
             if let ci = project.timeline.tracks[i].clips.firstIndex(where: { $0.id == clip.id }) {
                 project.timeline.tracks[i].clips[ci].effects.append(
-                    EffectDescriptor(kind: kind, start: clip.timelineStart, duration: duration)
+                    EffectDescriptor(kind: kind,
+                        start: kind == .fadeOut
+                            ? max(clip.timelineStart, clip.timelineStart + clip.timelineDuration - duration)
+                            : clip.timelineStart,
+                        duration: duration)
                 )
                 return
             }
@@ -490,7 +556,61 @@ struct EditorView: View {
         selectedClipKey = nil
     }
 
+    private func undoEdit() {
+        guard let previous = undoStack.popLast(), let current = env.currentProject else { return }
+        redoStack.append(current)
+        env.currentProject = previous
+        player = nil
+    }
+
+    private func redoEdit() {
+        guard let next = redoStack.popLast(), let current = env.currentProject else { return }
+        undoStack.append(current)
+        env.currentProject = next
+        player = nil
+    }
+
     // MARK: - Preview
+
+    private func importVideo() async {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.movie]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let duration = try await AVURLAsset(url: url).load(.duration).seconds
+            guard duration.isFinite, duration > 0, var project = env.currentProject,
+                  let index = project.timeline.tracks.firstIndex(where: { $0.kind == .screen }) else { return }
+            let start = project.timeline.duration
+            project.timeline.tracks[index].clips.append(Clip(
+                id: UUID(), assetURL: url, sourceStart: 0,
+                sourceDuration: duration, timelineStart: start))
+            project.timeline.duration += duration
+            project.modifiedAt = .now
+            env.currentProject = project
+            player = nil
+        } catch {
+            previewVM.reportError("Não foi possível importar o vídeo: \(error.localizedDescription)")
+        }
+    }
+
+    private func importImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        guard panel.runModal() == .OK, let url = panel.url,
+              var project = env.currentProject,
+              let trackIndex = project.timeline.tracks.firstIndex(where: { $0.kind == .screen }),
+              let clipIndex = project.timeline.tracks[trackIndex].clips.firstIndex(where: {
+                  playhead >= $0.timelineStart && playhead < $0.timelineStart + $0.timelineDuration
+              }) else { return }
+        let remaining = project.timeline.duration - playhead
+        project.timeline.tracks[trackIndex].clips[clipIndex].annotations.append(Annotation(
+            kind: .image, start: playhead, duration: min(5, remaining),
+            rect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3),
+            text: url.absoluteString))
+        project.modifiedAt = .now
+        env.currentProject = project
+        player = nil
+    }
 
     private func revealRecordingInFinder() {
         guard let dir = env.lastRecordingResult?.outputDirectory else { return }
@@ -505,6 +625,7 @@ struct EditorView: View {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("preview-\(UUID().uuidString.prefix(6)).mp4")
         let preset = ExportPreset.defaultPresets.first!
+        player = nil
         previewVM.start()
         defer { previewVM.stop() }
 
@@ -515,7 +636,8 @@ struct EditorView: View {
             cameraOverlay: env.sourceConfig.cameraOverlay,
             includeCamera: env.sourceConfig.camera != nil && !env.sourceConfig.cameraOverlay.hidden,
             micVolume: env.currentProject?.timeline.track(.microphone)?.volume ?? 1.0,
-            systemVolume: env.currentProject?.timeline.track(.systemAudio)?.volume ?? 0.7
+            systemVolume: env.currentProject?.timeline.track(.systemAudio)?.volume ?? 0.7,
+            project: env.currentProject
         )
 
         switch env.exporter.status {
@@ -533,31 +655,67 @@ struct EditorView: View {
     }
 
     private func installPlayer(url: URL) async {
-        let item = AVPlayerItem(url: url)
-        let p = AVPlayer(playerItem: item)
+        let p = AVPlayer(url: url)
+        self.player = p
+        p.play()
+    }
+}
 
-        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
-            let token = ObserverToken()
-            token.onFinish = {
-                if !token.resumed {
-                    token.resumed = true
-                    if let obs = token.observer {
-                        NotificationCenter.default.removeObserver(obs)
-                    }
-                    cont.resume()
+private struct NativePlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .floating
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        if view.player !== player { view.player = player }
+    }
+}
+
+private struct PrivacySelectionOverlay: View {
+    @Binding var rect: CGRect
+    let regions: [PrivacyRegion]
+    @State private var dragStart: CGPoint?
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                ForEach(regions) { region in
+                    Rectangle()
+                        .stroke(.orange, lineWidth: 2)
+                        .background(.orange.opacity(0.15))
+                        .frame(width: region.rect.width * geometry.size.width,
+                               height: region.rect.height * geometry.size.height)
+                        .offset(x: region.rect.minX * geometry.size.width,
+                                y: region.rect.minY * geometry.size.height)
                 }
+                Rectangle()
+                    .stroke(.cyan, lineWidth: 3)
+                    .background(.cyan.opacity(0.18))
+                    .frame(width: rect.width * geometry.size.width,
+                           height: rect.height * geometry.size.height)
+                    .offset(x: rect.minX * geometry.size.width,
+                            y: rect.minY * geometry.size.height)
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 5)
+                        .onChanged { value in
+                            let start = dragStart ?? value.startLocation
+                            dragStart = start
+                            let x1 = min(max(0, start.x / geometry.size.width), 1)
+                            let y1 = min(max(0, start.y / geometry.size.height), 1)
+                            let x2 = min(max(0, value.location.x / geometry.size.width), 1)
+                            let y2 = min(max(0, value.location.y / geometry.size.height), 1)
+                            rect = CGRect(x: min(x1, x2), y: min(y1, y2),
+                                          width: abs(x2 - x1), height: abs(y2 - y1))
+                        }
+                        .onEnded { _ in dragStart = nil })
             }
-            token.observer = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: item,
-                queue: .main
-            ) { _ in token.onFinish?() }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
-                token.onFinish?()
-            }
-            self.player = p
-            p.play()
         }
     }
 }
@@ -596,6 +754,8 @@ struct ClipInspectorSheet: View {
     @State private var fadeInDuration: Double = 0.5
     @State private var fadeOutDuration: Double = 0.5
     @State private var volume: Float = 1.0
+    @State private var trimStart: Double = 0
+    @State private var trimEnd: Double = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -670,6 +830,23 @@ struct ClipInspectorSheet: View {
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
+                    }
+                }
+            }
+
+            GroupBox("Aparar clipe") {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Remover do início")
+                        Slider(value: $trimStart, in: 0...max(0.01, clip.sourceDuration - 0.05))
+                        Text("\(trimStart, specifier: "%.1f")s")
+                        Button("Aplicar") { onApply(.trimStart(trimStart)); dismiss() }
+                    }
+                    HStack {
+                        Text("Remover do fim")
+                        Slider(value: $trimEnd, in: 0...max(0.01, clip.sourceDuration - 0.05))
+                        Text("\(trimEnd, specifier: "%.1f")s")
+                        Button("Aplicar") { onApply(.trimEnd(trimEnd)); dismiss() }
                     }
                 }
             }

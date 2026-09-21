@@ -64,6 +64,11 @@ final class CameraPreviewNSView: NSView {
     }
     required init?(coder: NSCoder) { fatalError() }
     override func makeBackingLayer() -> CALayer { CALayer() }
+    override func layout() {
+        super.layout()
+        layer?.sublayers?.compactMap { $0 as? AVCaptureVideoPreviewLayer }
+            .forEach { $0.frame = bounds }
+    }
 }
 
 struct CameraPreviewView: NSViewRepresentable {
@@ -72,12 +77,14 @@ struct CameraPreviewView: NSViewRepresentable {
     func makeNSView(context: Context) -> CameraPreviewNSView {
         let v = CameraPreviewNSView(frame: .zero)
         previewLayer.frame = v.bounds
-        v.layer = previewLayer
+        v.layer?.addSublayer(previewLayer)
         return v
     }
 
     func updateNSView(_ nsView: CameraPreviewNSView, context: Context) {
         previewLayer.frame = nsView.bounds
-        nsView.layer = previewLayer
+        if previewLayer.superlayer !== nsView.layer {
+            nsView.layer?.addSublayer(previewLayer)
+        }
     }
 }

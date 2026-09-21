@@ -14,6 +14,8 @@ import Combine
 @MainActor
 final class MenuBarController: ObservableObject {
 
+    var isAttached: Bool { statusItem != nil }
+
     private var statusItem: NSStatusItem?
     private weak var session: RecordingSession?
     private var onStopRequested: (() -> Void)?
@@ -125,10 +127,8 @@ enum WindowHider {
     /// Esconde a janela principal (sem encerrar o app) para que ela não
     /// apareça na captura de tela.
     static func hideMainWindow() {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else {
-            return
-        }
-        window.orderOut(nil)
+        // Ocultar a única janela de um WindowGroup faz o SwiftUI criar outra,
+        // abandonando a RecordingView e a sessão ativa. Mantemos a janela.
     }
 
     /// Traz a janela principal de volta e foca.

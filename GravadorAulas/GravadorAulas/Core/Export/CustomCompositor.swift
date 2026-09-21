@@ -31,6 +31,9 @@ struct CompositorInstructions {
     let cursorSamples: [CursorSample]
     let annotations: [Annotation]
     let trackKindForInstruction: TrackKind
+    let screenTrackID: CMPersistentTrackID
+    let cameraTrackID: CMPersistentTrackID?
+    let cameraRect: CGRect
 }
 
 struct CursorSample {
@@ -75,10 +78,6 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
     // MARK: - Renderização de fato
 
     private func handle(_ request: AVAsynchronousVideoCompositionRequest) {
-        guard let trackID = request.sourceTrackIDs.first as? Int32 else {
-            request.finish(with: NSError(domain: "GravadorAulas.Compositor", code: 1))
-            return
-        }
         guard let instructions = Self.sharedInstructions else {
             request.finish(with: NSError(domain: "GravadorAulas.Compositor", code: 2))
             return
@@ -88,7 +87,7 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
         let tSeconds = CMTimeGetSeconds(presentationTime)
 
         // Pega buffer do source para o track ID
-        guard let sourceBuffer = request.sourceFrame(byTrackID: trackID) else {
+        guard let sourceBuffer = request.sourceFrame(byTrackID: instructions.screenTrackID) else {
             request.finish(with: NSError(domain: "GravadorAulas.Compositor", code: 3))
             return
         }
@@ -103,6 +102,7 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
         // Processa: começa com imagem base e aplica overlays
         processFrame(
             source: sourceBuffer,
+            camera: instructions.cameraTrackID.flatMap { request.sourceFrame(byTrackID: $0) },
             destination: outputBuffer,
             instructions: instructions,
             time: tSeconds
@@ -112,15 +112,37 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
     }
 
     private func processFrame(source: CVPixelBuffer,
+                              camera: CVPixelBuffer?,
                               destination: CVPixelBuffer,
                               instructions: CompositorInstructions,
                               time: Double) {
         var ciImage = CIImage(cvPixelBuffer: source)
 
+        // Trabalha em coordenadas do vídeo final antes de posicionar efeitos.
+        let renderSize = instructions.renderSize
+        let screenScale = max(renderSize.width / ciImage.extent.width,
+                              renderSize.height / ciImage.extent.height)
+        ciImage = ciImage.transformed(by: CGAffineTransform(scaleX: screenScale, y: screenScale))
+        ciImage = ciImage.cropped(to: CGRect(origin: .zero, size: renderSize))
+        if let camera {
+            var cam = CIImage(cvPixelBuffer: camera)
+            let rect = instructions.cameraRect
+            let target = CGRect(x: rect.minX * renderSize.width,
+                                y: (1 - rect.maxY) * renderSize.height,
+                                width: rect.width * renderSize.width,
+                                height: rect.height * renderSize.height)
+            cam = cam.transformed(by: CGAffineTransform(
+                scaleX: target.width / cam.extent.width,
+                y: target.height / cam.extent.height))
+            cam = cam.transformed(by: CGAffineTransform(
+                translationX: target.minX, y: target.minY))
+            ciImage = cam.composited(over: ciImage)
+        }
+
         // 1) Aplica regiões de privacidade
         for region in instructions.privacyRegions {
             guard time >= region.start && time <= region.end else { continue }
-            ciImage = applyPrivacy(region: region, to: ciImage, renderSize: instructions.renderSize)
+            ciImage = applyPrivacy(region: region, to: ciImage, renderSize: renderSize)
         }
 
         // 2) Renderiza overlays via Core Graphics em uma imagem temporária
@@ -129,14 +151,7 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
             ciImage = overlay.composited(over: ciImage)
         }
 
-        // 3) Escala para renderSize
-        if ciImage.extent.size != instructions.renderSize {
-            let scaleX = instructions.renderSize.width  / ciImage.extent.width
-            let scaleY = instructions.renderSize.height / ciImage.extent.height
-            ciImage = ciImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
-        }
-
-        // 4) Renderiza para o buffer de saída
+        // 3) Renderiza para o buffer de saída
         ciContext.render(ciImage, to: destination)
     }
 
@@ -153,21 +168,20 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
         switch region.mode {
         case .blur:
             let f = CIFilter.boxBlur()
-            f.radius = Float(20 * region.intensity)
-            f.inputImage = image.cropped(to: rect)
+            f.radius = Float(max(1, 20 * region.intensity))
+            f.inputImage = image.clampedToExtent()
             if let out = f.outputImage {
-                // Composite do blur de volta na posição original
-                return out.composited(over: blankOutside(rect: rect, in: image))
+                return out.cropped(to: rect).composited(over: image)
             }
             return image
 
         case .pixelate:
             let f = CIFilter.pixellate()
             f.center = CGPoint(x: rect.midX, y: rect.midY)
-            f.scale = Float(20 * region.intensity)
+            f.scale = Float(max(2, 20 * region.intensity))
             f.inputImage = image
             if let out = f.outputImage {
-                return out
+                return out.cropped(to: rect).composited(over: image)
             }
             return image
 
@@ -177,11 +191,6 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
                 .cropped(to: rect)
             return barImage.composited(over: image)
         }
-    }
-
-    private func blankOutside(rect: CGRect, in image: CIImage) -> CIImage {
-        // Crop a imagem dentro do rect (para o blur overlay)
-        return image.cropped(to: rect)
     }
 
     private func renderOverlays(instructions: CompositorInstructions,
@@ -351,8 +360,15 @@ final class GravadorAulasCompositor: NSObject, AVVideoCompositing {
                         .draw(in: rect)
                 }
 
-            case .image, .keyPress:
-                break   // implementações futuras
+            case .image:
+                if let path = ann.text, let url = URL(string: path),
+                   url.isFileURL, let image = NSImage(contentsOf: url),
+                   let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    ctx.draw(cgImage, in: rect)
+                }
+
+            case .keyPress:
+                break
             }
         }
     }

@@ -15,6 +15,7 @@ struct ExportSheetView: View {
 
     @State private var selectedPreset: ExportPreset = ExportPreset.defaultPresets[0]
     @State private var embedSubtitles: Bool = false
+    @State private var exportSRT: Bool = true
     @State private var generateChapterText: Bool = true
     @State private var micVolume: Float = 1.0
     @State private var systemVolume: Float = 0.7
@@ -71,6 +72,11 @@ struct ExportSheetView: View {
                         Button("Escolher…") { chooseOutput() }
                     }
                     Toggle("Incorporar legendas no MP4", isOn: $embedSubtitles)
+                        .disabled(true)
+                    Text("Legendas incorporadas ainda não estão disponíveis.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Toggle("Exportar legendas SRT", isOn: $exportSRT)
+                        .disabled(env.currentProject?.transcriptionSegments?.isEmpty ?? true)
                     Toggle("Gerar lista de capítulos", isOn: $generateChapterText)
                 }
             }
@@ -100,6 +106,10 @@ struct ExportSheetView: View {
         .frame(minWidth: 540, minHeight: 540)
         .sheet(isPresented: $showEditor) {
             PresetEditorView(preset: $selectedPreset)
+        }
+        .onAppear {
+            micVolume = env.currentProject?.timeline.track(.microphone)?.volume ?? 1.0
+            systemVolume = env.currentProject?.timeline.track(.systemAudio)?.volume ?? 0.7
         }
     }
 
@@ -159,11 +169,17 @@ struct ExportSheetView: View {
             cameraOverlay: env.sourceConfig.cameraOverlay,
             includeCamera: env.sourceConfig.camera != nil && !env.sourceConfig.cameraOverlay.hidden,
             micVolume: micVolume,
-            systemVolume: systemVolume
+            systemVolume: systemVolume,
+            project: env.currentProject
         )
 
-        if generateChapterText {
-            writeChapterList(to: url.deletingPathExtension().appendingPathExtension("txt"))
+        if case .finished = env.exporter.status {
+            if generateChapterText {
+                writeChapterList(to: url.deletingPathExtension().appendingPathExtension("txt"))
+            }
+            if exportSRT {
+                writeSRT(to: url.deletingPathExtension().appendingPathExtension("srt"))
+            }
         }
     }
 
@@ -173,11 +189,22 @@ struct ExportSheetView: View {
         lines.append("# Capítulos de \(project.name)")
         lines.append("")
         for ch in project.chapters.sorted(by: { $0.start < $1.start }) {
-            lines.append("\(ch.start.hmsString)  \(ch.title)")
+            let removedBefore = (project.removedRanges ?? []).reduce(0.0) { sum, range in
+                sum + max(0, min(ch.start, range.end) - range.start)
+            }
+            lines.append("\(max(0, ch.start - removedBefore).hmsString)  \(ch.title)")
         }
         let body = lines.joined(separator: "\n")
         try? body.write(to: url, atomically: true, encoding: .utf8)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(body, forType: .string)
+    }
+
+    private func writeSRT(to url: URL) {
+        guard let segments = env.currentProject?.transcriptionSegments, !segments.isEmpty else { return }
+        let body = segments.enumerated().map { index, segment in
+            "\(index + 1)\n\(segment.start.srtTimestamp) --> \(segment.end.srtTimestamp)\n\(segment.text)\n"
+        }.joined(separator: "\n")
+        try? body.write(to: url, atomically: true, encoding: .utf8)
     }
 }

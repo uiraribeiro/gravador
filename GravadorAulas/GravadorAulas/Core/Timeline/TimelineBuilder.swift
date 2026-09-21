@@ -45,10 +45,19 @@ struct TimelineBuilder {
                 )
                 tracks[2].clips.append(c)
             }
-            // Áudio do sistema é a trilha audio do próprio screen, não uma trilha extra
+            // A trilha do sistema usa o áudio embutido nos arquivos de tela.
+            // Os clipes espelhados permitem controlar volume e mudo no editor.
+            if project.sources.captureSystemAudio {
+                tracks[3].clips = tracks[0].clips.map { clip in
+                    var audioClip = clip
+                    audioClip.id = UUID()
+                    return audioClip
+                }
+            }
         }
 
-        let duration = recordingResult?.timelineDuration ?? 0
+        let duration = max(recordingResult?.timelineDuration ?? 0,
+            tracks[0].clips.map { $0.timelineStart + $0.sourceDuration }.max() ?? 0)
         return Timeline(tracks: tracks, duration: duration)
     }
 }

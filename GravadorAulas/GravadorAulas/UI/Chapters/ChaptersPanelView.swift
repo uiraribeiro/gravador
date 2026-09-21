@@ -1,37 +1,56 @@
-//
-//  ChaptersPanelView.swift
-//  GravadorAulas
-//
-//  Stub da Etapa 1. Implementação completa na Etapa 4:
-//  - sugestão automática via transcrição
-//  - criar/renomear/mover/excluir manualmente
-//  - exportar para colar na descrição da plataforma
-//
-
 import SwiftUI
 
 struct ChaptersPanelView: View {
     @EnvironmentObject var env: AppEnvironment
+    @State private var title = ""
+    @State private var start: Double = 0
 
     var body: some View {
-        VStack(alignment: .leading) {
-            Text("Capítulos")
-                .font(.headline)
-            Text("Disponível na Etapa 4 — sugerido por assunto a partir da transcrição.")
-                .font(.callout).foregroundStyle(.secondary)
-
-            if let project = env.currentProject {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Capítulos").font(.headline)
+            HStack {
+                TextField("Nome do assunto", text: $title)
+                TextField("Segundo", value: $start, format: .number)
+                    .frame(width: 74)
+                Button("Adicionar") { addChapter() }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            if let chapters = env.currentProject?.chapters {
                 List {
-                    ForEach(project.chapters) { c in
+                    ForEach(chapters.sorted(by: { $0.start < $1.start })) { chapter in
                         HStack {
-                            Text(c.start.hmsString).monospacedDigit()
-                            Text(c.title)
+                            Text(chapter.start.hmsString)
+                                .monospacedDigit()
+                                .frame(width: 70, alignment: .leading)
+                            Text(chapter.title)
+                            Spacer()
+                            Button(role: .destructive) { removeChapter(chapter.id) } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
-                .frame(minHeight: 120)
+                .frame(minHeight: 100)
             }
         }
         .padding()
+    }
+
+    private func addChapter() {
+        guard var project = env.currentProject else { return }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty, start >= 0, start <= project.timeline.duration else { return }
+        project.chapters.append(Chapter(title: cleanTitle, start: start))
+        project.modifiedAt = .now
+        env.currentProject = project
+        title = ""
+    }
+
+    private func removeChapter(_ id: UUID) {
+        guard var project = env.currentProject else { return }
+        project.chapters.removeAll { $0.id == id }
+        project.modifiedAt = .now
+        env.currentProject = project
     }
 }

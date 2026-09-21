@@ -61,6 +61,7 @@ struct RecordingView: View {
         }
         .onDisappear {
             countdownTimer?.invalidate()
+            session.stopPreviewIfIdle()
             // Garante que a menu bar não fica órfã se o usuário sair da tela
             env.menuBar.detach()
             WindowHider.showMainWindow()
@@ -140,12 +141,10 @@ struct RecordingView: View {
                         Image(systemName: "camera.fill")
                         Text(cam.displayName)
                     }
-                    CameraPreviewView(previewLayer: CameraPreviewFactory.make())
+                    CameraPreviewView(previewLayer: session.cameraPreviewLayer)
                         .frame(height: 180)
                         .background(Color.black)
                         .cornerRadius(8)
-                    Text("(prévias só disponíveis após gravação)")
-                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
 
@@ -273,23 +272,11 @@ struct RecordingView: View {
         await MainActor.run {
             env.lastRecordingResult = result
             var p = env.currentProject ?? Project.empty(name: "Nova aula")
+            p.sources = env.sourceConfig
             p.timeline = TimelineBuilder.build(from: p, recordingResult: result)
             p.modifiedAt = .now
             env.currentProject = p
             onStop()
         }
-    }
-}
-
-// MARK: - Camera preview factory (etapa 1: não-real, etapa 2: real)
-
-enum CameraPreviewFactory {
-    @MainActor
-    static func make() -> AVCaptureVideoPreviewLayer {
-        // Para a Etapa 1 a prévia da câmera é cosmética.
-        // A Etapa 2 conecta um AVCaptureSession dedicado à UI.
-        let session = AVCaptureSession()
-        session.sessionPreset = .high
-        return AVCaptureVideoPreviewLayer(session: session)
     }
 }
