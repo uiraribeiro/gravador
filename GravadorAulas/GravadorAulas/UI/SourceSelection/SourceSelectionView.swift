@@ -15,10 +15,7 @@ struct SourceSelectionView: View {
 
     @State private var displays: [SCDisplay] = []
     @State private var windows: [SCWindow] = []
-    @State private var isRegionSelected = false
-    @State private var regionStart: CGPoint = .zero
-    @State private var regionEnd: CGPoint = .zero
-    @State private var showRegionPicker = false
+    @State private var isPresentingRegionPicker = false
 
     let onContinue: () -> Void
 
@@ -198,27 +195,44 @@ Sem isso, o app continua tentando acessar a tela sem autorização e o sistema r
                 ForEach(windows, id: \.windowID) { w in
                     Text(w.title ?? "Janela \(w.windowID)").tag(ScreenSource.window(windowID: w.windowID, title: w.title))
                 }
-                Text("Região retangular…").tag(ScreenSource.region(rect: CGRect(x: 0, y: 0, width: 1280, height: 720),
-                                                                    displayID: CGMainDisplayID(),
-                                                                    label: "Manual"))
+                if case .region(let rect, _, _) = env.sourceConfig.screen {
+                    Text("Região \(Int(rect.width))×\(Int(rect.height))")
+                        .tag(env.sourceConfig.screen)
+                }
             }
             .pickerStyle(.menu)
-            .onChange(of: env.sourceConfig.screen) { _, newValue in
-                if case .region = newValue {
-                    showRegionPicker = true
+            Button {
+                presentRegionPicker(on: env.sourceConfig.screen.displayID)
+            } label: {
+                Label("Marcar região na tela…", systemImage: "viewfinder")
+            }
+            .disabled(isPresentingRegionPicker)
+            if case .region(let rect, let displayID, _) = env.sourceConfig.screen {
+                HStack {
+                    Text("Área: \(Int(rect.width)) × \(Int(rect.height))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Marcar novamente na tela") {
+                        presentRegionPicker(on: displayID)
+                    }
+                    .controlSize(.small)
                 }
             }
             Toggle("Capturar áudio do computador", isOn: $env.sourceConfig.captureSystemAudio)
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .underPageBackgroundColor)))
-        .sheet(isPresented: $showRegionPicker) {
-            RegionPickerView { rect in
-                env.sourceConfig.screen = .region(rect: rect,
-                                                  displayID: CGMainDisplayID(),
-                                                  label: "\(Int(rect.width))×\(Int(rect.height))")
-                showRegionPicker = false
-            }
+    }
+
+    private func presentRegionPicker(on displayID: CGDirectDisplayID) {
+        isPresentingRegionPicker = true
+        RegionSelectionController.present(displayID: displayID) { rect in
+            env.sourceConfig.screen = .region(
+                rect: rect, displayID: displayID,
+                label: "\(Int(rect.width))×\(Int(rect.height))")
+            isPresentingRegionPicker = false
+        } onCancel: {
+            env.sourceConfig.screen = .display(displayID: displayID)
+            isPresentingRegionPicker = false
         }
     }
 
@@ -321,10 +335,81 @@ Sem isso, o app continua tentando acessar a tela sem autorização e o sistema r
     }
 }
 
-// MARK: - Region picker (overlay simples)
+// MARK: - Region picker sobre a tela real
+
+@MainActor
+final class RegionSelectionController: NSObject {
+    private static var active: RegionSelectionController?
+    private var window: NSWindow?
+    private let onSelect: (CGRect) -> Void
+    private let onCancel: () -> Void
+
+    private init(onSelect: @escaping (CGRect) -> Void,
+                 onCancel: @escaping () -> Void) {
+        self.onSelect = onSelect
+        self.onCancel = onCancel
+    }
+
+    static func present(displayID: CGDirectDisplayID,
+                        onSelect: @escaping (CGRect) -> Void,
+                        onCancel: @escaping () -> Void) {
+        active?.cancel()
+        let controller = RegionSelectionController(onSelect: onSelect, onCancel: onCancel)
+        active = controller
+        controller.show(displayID: displayID)
+    }
+
+    private func show(displayID: CGDirectDisplayID) {
+        guard let screen = NSScreen.screens.first(where: {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
+        }) ?? NSScreen.main else {
+            cancel()
+            return
+        }
+        let panel = NSWindow(
+            contentRect: screen.frame,
+            styleMask: [.titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: false,
+            screen: screen)
+        panel.level = .screenSaver
+        panel.title = "Selecionar região de captura"
+        panel.setAccessibilityLabel("Selecionar região de captura")
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = false
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.contentView = NSHostingView(rootView: RegionPickerView(
+            onSelect: { [weak self] rect in self?.finish(rect) },
+            onCancel: { [weak self] in self?.cancel() }))
+        window = panel
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func finish(_ rect: CGRect) {
+        window?.orderOut(nil)
+        window = nil
+        Self.active = nil
+        onSelect(rect.integral)
+    }
+
+    private func cancel() {
+        window?.orderOut(nil)
+        window = nil
+        Self.active = nil
+        onCancel()
+    }
+}
 
 struct RegionPickerView: View {
     let onSelect: (CGRect) -> Void
+    let onCancel: () -> Void
 
     @State private var start: CGPoint? = nil
     @State private var end: CGPoint? = nil
@@ -332,7 +417,21 @@ struct RegionPickerView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                Color.black.opacity(0.4)
+                Canvas { context, size in
+                    var mask = Path()
+                    mask.addRect(CGRect(origin: .zero, size: size))
+                    if let rect = selectedRect { mask.addRect(rect) }
+                    context.fill(mask, with: .color(.black.opacity(0.48)), style: .init(eoFill: true))
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 2)
+                        .onChanged { value in
+                            start = value.startLocation
+                            end = value.location
+                        }
+                        .onEnded { value in end = value.location }
+                )
                 if let s = start, let e = end {
                     let rect = CGRect(
                         x: min(s.x, e.x),
@@ -344,35 +443,42 @@ struct RegionPickerView: View {
                         .background(Color.accentColor.opacity(0.2))
                         .frame(width: rect.width, height: rect.height)
                         .position(x: rect.midX, y: rect.midY)
+                        .allowsHitTesting(false)
                 }
             }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        start = value.startLocation
-                        end = value.location
-                    }
-                    .onEnded { value in
-                        let rect = CGRect(
-                            x: min(value.startLocation.x, value.location.x),
-                            y: min(value.startLocation.y, value.location.y),
-                            width: abs(value.location.x - value.startLocation.x),
-                            height: abs(value.location.y - value.startLocation.y))
-                        if rect.width > 100 && rect.height > 100 {
-                            onSelect(rect)
-                        }
-                    }
-            )
         }
         .ignoresSafeArea()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topLeading) {
-            Text("Arraste para selecionar a região")
-                .padding()
-                .background(.thinMaterial)
-                .cornerRadius(8)
-                .padding()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Arraste para marcar a região da tela").bold()
+                Text(selectedRect.map { "\(Int($0.width)) × \(Int($0.height))" } ?? "Área mínima: 100 × 100")
+                    .font(.caption)
+                HStack {
+                    Button("Cancelar", action: onCancel)
+                        .keyboardShortcut(.cancelAction)
+                    Button("Usar esta região") {
+                        if let rect = selectedRect { onSelect(rect) }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!isValidSelection)
+                }
+            }
+            .padding()
+            .background(.regularMaterial)
+            .cornerRadius(10)
+            .padding()
         }
+    }
+
+    private var selectedRect: CGRect? {
+        guard let s = start, let e = end else { return nil }
+        return CGRect(x: min(s.x, e.x), y: min(s.y, e.y),
+                      width: abs(e.x - s.x), height: abs(e.y - s.y))
+    }
+
+    private var isValidSelection: Bool {
+        guard let rect = selectedRect else { return false }
+        return rect.width >= 100 && rect.height >= 100
     }
 }

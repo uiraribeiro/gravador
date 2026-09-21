@@ -4,11 +4,8 @@
 //
 //  Tela 3: revisão e edição da aula gravada.
 //
-//  Etapa 1: timeline visual, clipes clicáveis, inspector com ações
-//            básicas (deletar, fade in/out, volume), controles de playhead.
-//
-//  Etapa 2 amplia: trim preciso, split no playhead, anotações, undo/redo,
-//                  destaque do cursor.
+//  Timeline não destrutiva com trim, corte, fades, volume, anotações,
+//  privacidade, importação de mídia e undo/redo.
 //
 
 import SwiftUI
@@ -27,6 +24,9 @@ struct EditorView: View {
     @State private var showChaptersPanel = false
     @State private var showPrivacyPanel = false
     @State private var privacyDraftRect = CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.15)
+    @State private var annotationTool: Annotation.Kind?
+    @State private var annotationText = ""
+    @State private var annotationDuration: Double = 3
 
     // Edição
     @State private var selectedClipKey: String? = nil    // "trackKind:clipId"
@@ -129,6 +129,11 @@ struct EditorView: View {
                             PrivacySelectionOverlay(rect: $privacyDraftRect,
                                 regions: env.currentProject?.privacyRegions ?? [])
                         }
+                        if let tool = annotationTool {
+                            AnnotationDrawingOverlay(kind: tool) { rect in
+                                addAnnotation(kind: tool, rect: rect)
+                            }
+                        }
                     }
                     .aspectRatio(16/9, contentMode: .fit)
                 } else {
@@ -145,7 +150,7 @@ struct EditorView: View {
             Divider()
 
             timelineBar
-                .frame(height: 180)
+                .frame(height: 220)
                 .background(Color(nsColor: .underPageBackgroundColor))
         }
     }
@@ -166,7 +171,7 @@ struct EditorView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
-                    Text("Dica: apague os segmentos antigos em $TMPDIR/GravadorAulas/ e grave novamente.")
+                    Text("Confira se os arquivos do projeto ainda existem ou grave novamente.")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .multilineTextAlignment(.center)
@@ -226,6 +231,23 @@ struct EditorView: View {
             ScrollView(.horizontal, showsIndicators: true) {
                 ZStack(alignment: .leading) {
                     VStack(alignment: .leading, spacing: 6) {
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                            Text("Arraste aqui para posicionar")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 116)
+                        }
+                        .frame(height: 18)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    setPlayhead(fromTimelineX: value.location.x)
+                                }
+                        )
+
                         ForEach(env.currentProject?.timeline.tracks ?? []) { track in
                             HStack(spacing: 6) {
                                 Image(systemName: icon(for: track.kind))
@@ -251,19 +273,12 @@ struct EditorView: View {
                     // Playhead
                     Rectangle()
                         .fill(Color.accentColor)
-                        .frame(width: 2, height: 7 * 28)
+                        .frame(width: 2, height: 18 + 7 * 28)
                         .offset(x: CGFloat(playhead) * pixelsPerSecond + 110)
                         .allowsHitTesting(false)
                 }
                 .frame(minWidth: CGFloat((env.currentProject?.timeline.duration ?? 60)) * pixelsPerSecond + 120)
             }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let localX = max(0, value.location.x - 110)
-                        playhead = Double(localX / pixelsPerSecond)
-                    }
-            )
 
             // Controles do playhead
             HStack(spacing: 16) {
@@ -380,6 +395,33 @@ struct EditorView: View {
                     Toggle("Regiões de privacidade", isOn: $showPrivacyPanel)
                 }
 
+                Section("Anotações rápidas") {
+                    HStack(spacing: 8) {
+                        annotationButton(.arrow, icon: "arrow.up.right")
+                        annotationButton(.rectangle, icon: "rectangle")
+                        annotationButton(.circle, icon: "circle")
+                        annotationButton(.text, icon: "textformat")
+                    }
+                    if annotationTool == .text {
+                        TextField("Texto que aparecerá no vídeo", text: $annotationText)
+                    }
+                    HStack {
+                        Text("Duração")
+                        Spacer()
+                        Stepper("\(annotationDuration, specifier: "%.1f") s",
+                                value: $annotationDuration, in: 0.5...30, step: 0.5)
+                            .labelsHidden()
+                        Text("\(annotationDuration, specifier: "%.1f") s")
+                            .monospacedDigit()
+                    }
+                    if annotationTool != nil {
+                        Label("Arraste sobre o vídeo para posicionar.", systemImage: "cursorarrow.motionlines")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Cancelar ferramenta") { annotationTool = nil }
+                    }
+                }
+
                 Section("Visualização de teclas") {
                     if let count = env.currentProject?.keyEvents?.count, count > 0 {
                         Label("\(count) atalhos no vídeo", systemImage: "keyboard.fill")
@@ -494,10 +536,12 @@ struct EditorView: View {
             }
         }
 
+        recalculateDuration(in: &project)
         project.modifiedAt = .now
         undoStack.append(env.currentProject!)
         redoStack.removeAll()
         env.currentProject = project
+        player = nil
         AppLog.editor.info("edit aplicado: \(String(describing: action), privacy: .public)")
     }
 
@@ -563,6 +607,71 @@ struct EditorView: View {
         player = nil
     }
 
+    private func setPlayhead(fromTimelineX x: CGFloat) {
+        let duration = env.currentProject?.timeline.duration ?? 0
+        let seconds = Double(max(0, x - 110) / pixelsPerSecond)
+        playhead = min(duration, seconds)
+        player?.seek(to: CMTime(seconds: playhead, preferredTimescale: 600),
+                     toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+
+    @ViewBuilder
+    private func annotationButton(_ kind: Annotation.Kind, icon: String) -> some View {
+        Button {
+            annotationTool = annotationTool == kind ? nil : kind
+        } label: {
+            Image(systemName: icon).frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .tint(annotationTool == kind ? .accentColor : nil)
+        .help(annotationLabel(kind))
+    }
+
+    private func annotationLabel(_ kind: Annotation.Kind) -> String {
+        switch kind {
+        case .arrow: return "Seta"
+        case .rectangle: return "Retângulo"
+        case .circle: return "Círculo"
+        case .text: return "Texto"
+        case .image: return "Imagem"
+        case .keyPress: return "Tecla"
+        }
+    }
+
+    private func addAnnotation(kind: Annotation.Kind, rect: CGRect) {
+        guard rect.width > 0.01, rect.height > 0.01,
+              kind != .text || !annotationText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              var project = env.currentProject else { return }
+        guard let ti = project.timeline.tracks.firstIndex(where: { $0.kind == .screen }),
+              let ci = project.timeline.tracks[ti].clips.firstIndex(where: {
+                  playhead >= $0.timelineStart && playhead < $0.timelineStart + $0.timelineDuration
+              }) else {
+            previewVM.reportError("Posicione o cursor sobre um clipe de tela antes de adicionar a anotação.")
+            return
+        }
+        let maxDuration = max(0.1, project.timeline.duration - playhead)
+        let annotation = Annotation(kind: kind, start: playhead,
+                                    duration: min(annotationDuration, maxDuration),
+                                    rect: rect,
+                                    text: kind == .text ? annotationText : nil,
+                                    color: "#FF3B30")
+        undoStack.append(project)
+        redoStack.removeAll()
+        project.timeline.tracks[ti].clips[ci].annotations.append(annotation)
+        project.modifiedAt = .now
+        env.currentProject = project
+        player = nil
+        annotationTool = nil
+    }
+
+    private func recalculateDuration(in project: inout Project) {
+        project.timeline.duration = project.timeline.tracks
+            .flatMap(\.clips)
+            .map { $0.timelineStart + $0.timelineDuration }
+            .max() ?? 0
+        playhead = min(playhead, project.timeline.duration)
+    }
+
     private func redoEdit() {
         guard let next = redoStack.popLast(), let current = env.currentProject else { return }
         undoStack.append(current)
@@ -581,6 +690,8 @@ struct EditorView: View {
             guard duration.isFinite, duration > 0, var project = env.currentProject,
                   let index = project.timeline.tracks.firstIndex(where: { $0.kind == .screen }) else { return }
             let start = project.timeline.duration
+            undoStack.append(project)
+            redoStack.removeAll()
             project.timeline.tracks[index].clips.append(Clip(
                 id: UUID(), assetURL: url, sourceStart: 0,
                 sourceDuration: duration, timelineStart: start))
@@ -603,6 +714,8 @@ struct EditorView: View {
                   playhead >= $0.timelineStart && playhead < $0.timelineStart + $0.timelineDuration
               }) else { return }
         let remaining = project.timeline.duration - playhead
+        undoStack.append(project)
+        redoStack.removeAll()
         project.timeline.tracks[trackIndex].clips[clipIndex].annotations.append(Annotation(
             kind: .image, start: playhead, duration: min(5, remaining),
             rect: CGRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3),
@@ -716,6 +829,72 @@ private struct PrivacySelectionOverlay: View {
                         }
                         .onEnded { _ in dragStart = nil })
             }
+        }
+    }
+}
+
+private struct AnnotationDrawingOverlay: View {
+    let kind: Annotation.Kind
+    let onCommit: (CGRect) -> Void
+    @State private var start: CGPoint?
+    @State private var currentRect: CGRect = .zero
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                Color.clear.contentShape(Rectangle())
+                if currentRect.width > 0 && currentRect.height > 0 {
+                    annotationShape
+                        .frame(width: currentRect.width, height: currentRect.height)
+                        .offset(x: currentRect.minX, y: currentRect.minY)
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 4)
+                    .onChanged { value in
+                        let origin = start ?? value.startLocation
+                        start = origin
+                        currentRect = CGRect(
+                            x: min(origin.x, value.location.x),
+                            y: min(origin.y, value.location.y),
+                            width: abs(value.location.x - origin.x),
+                            height: abs(value.location.y - origin.y)
+                        )
+                    }
+                    .onEnded { _ in
+                        guard geometry.size.width > 0, geometry.size.height > 0 else { return }
+                        let normalized = CGRect(
+                            x: max(0, min(1, currentRect.minX / geometry.size.width)),
+                            y: max(0, min(1, currentRect.minY / geometry.size.height)),
+                            width: max(0, min(1, currentRect.width / geometry.size.width)),
+                            height: max(0, min(1, currentRect.height / geometry.size.height))
+                        )
+                        start = nil
+                        currentRect = .zero
+                        onCommit(normalized)
+                    }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var annotationShape: some View {
+        switch kind {
+        case .circle:
+            Ellipse().stroke(.red, lineWidth: 3)
+        case .arrow:
+            ZStack {
+                Rectangle().fill(.clear)
+                Image(systemName: "arrow.up.right")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(.red)
+            }
+        case .text:
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(.red, style: StrokeStyle(lineWidth: 2, dash: [5]))
+        default:
+            Rectangle().stroke(.red, lineWidth: 3)
         }
     }
 }

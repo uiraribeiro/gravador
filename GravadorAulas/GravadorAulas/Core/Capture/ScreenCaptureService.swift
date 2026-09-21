@@ -61,15 +61,28 @@ final class ScreenCaptureService: NSObject {
         cfg.excludesCurrentProcessAudio = true
 
         // sourceRect: usado quando 'region'
-        if case .region(let rect, _, _) = source {
+        if case .region(let rect, let displayID, _) = source {
             cfg.sourceRect = rect
-            cfg.width  = Int(rect.width)
-            cfg.height = Int(rect.height)
+            // Com preset, ScreenCaptureKit escala o recorte diretamente para
+            // o mesmo tamanho esperado pelo AVAssetWriter. Isso evita MP4
+            // incompleto quando a dimensão livre da seleção não coincide com
+            // a configuração do encoder.
+            if resolution.pixelSize == nil {
+                let scale = NSScreen.screens.first(where: {
+                    ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID
+                })?.backingScaleFactor ?? 1
+                cfg.width = Self.evenPixelDimension(rect.width * scale)
+                cfg.height = Self.evenPixelDimension(rect.height * scale)
+            }
         }
 
         // O filter é construído depois, pois depende de displays/windows.
         // Apenas guardamos a config.
         self.configuration = cfg
+    }
+
+    private static func evenPixelDimension(_ value: CGFloat) -> Int {
+        max(2, Int(value.rounded(.down)) / 2 * 2)
     }
 
     /// Resolve o SCContentFilter a partir do ScreenSource.

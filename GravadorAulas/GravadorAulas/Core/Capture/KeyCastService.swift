@@ -41,7 +41,7 @@ final class KeyCastService {
             options: .listenOnly,
             eventsOfInterest: mask,
             callback: { _, _, event, userDataPtr in
-                guard let userDataPtr else { return Unmanaged.passRetained(event) }
+                guard let userDataPtr else { return Unmanaged.passUnretained(event) }
                 let svc = Unmanaged<KeyCastService>.fromOpaque(userDataPtr).takeUnretainedValue()
                 return svc.handle(event: event)
             },
@@ -77,16 +77,16 @@ final class KeyCastService {
         let flags = event.flags
         let isShortcut = flags.contains(.maskCommand) || flags.contains(.maskControl)
         if !isShortcut {
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
         guard let display = Self.describe(keyCode: Int(keyCode), flags: flags) else {
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
         let now = Date.now.timeIntervalSinceReferenceDate
         let e = KeyEvent(timestamp: now, display: display, isShortcut: true)
         events.append(e)
         onEvent?(e)
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 
     static func describe(keyCode: Int, flags: CGEventFlags) -> String? {
