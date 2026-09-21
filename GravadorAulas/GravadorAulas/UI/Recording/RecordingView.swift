@@ -16,6 +16,8 @@ struct RecordingView: View {
     @State private var countdown: Int? = nil
     @State private var countdownTimer: Timer?
     @State private var didPrepare: Bool = false
+    @State private var recordedKeyEvents: [KeyCastService.KeyEvent] = []
+    @State private var keyCastUnavailable = false
 
     let onStop: () -> Void
 
@@ -61,10 +63,15 @@ struct RecordingView: View {
         }
         .onDisappear {
             countdownTimer?.invalidate()
+            env.keycast.stop()
+            env.keycast.onEvent = nil
             session.stopPreviewIfIdle()
             // Garante que a menu bar não fica órfã se o usuário sair da tela
             env.menuBar.detach()
             WindowHider.showMainWindow()
+        }
+        .onChange(of: session.state) { _, state in
+            syncKeyCast(for: state)
         }
     }
 
@@ -154,6 +161,10 @@ struct RecordingView: View {
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.red.opacity(0.1)))
             }
+            if keyCastUnavailable {
+                Text("Atalhos não capturados: conceda Acessibilidade nos Ajustes do Sistema e reinicie a gravação.")
+                    .font(.caption).foregroundStyle(.orange)
+            }
 
             Spacer()
         }
@@ -228,8 +239,29 @@ struct RecordingView: View {
 
     // MARK: - Actions
 
+    private func syncKeyCast(for state: RecordingSession.State) {
+        guard env.sourceConfig.showKeyCast else { return }
+        switch state {
+        case .recording:
+            env.keycast.onEvent = { event in
+                Task { @MainActor in
+                    guard session.state == .recording else { return }
+                    recordedKeyEvents.append(.init(
+                        timestamp: session.currentTimelineTime,
+                        display: event.display,
+                        isShortcut: true))
+                }
+            }
+            if !env.keycast.start() { keyCastUnavailable = true }
+        case .paused, .stopping, .idle, .ready, .preparing:
+            env.keycast.stop()
+        }
+    }
+
     private func startCountdownAndRecord() {
         guard countdown == nil else { return }
+        recordedKeyEvents.removeAll()
+        keyCastUnavailable = false
         var n = 3
         countdown = n
         countdownTimer?.invalidate()
@@ -266,6 +298,7 @@ struct RecordingView: View {
     }
 
     private func stopAndGoToReview() async {
+        env.keycast.stop()
         env.menuBar.detach()
         let result = await session.stop()
         WindowHider.showMainWindow()
@@ -274,6 +307,7 @@ struct RecordingView: View {
             var p = env.currentProject ?? Project.empty(name: "Nova aula")
             p.sources = env.sourceConfig
             p.timeline = TimelineBuilder.build(from: p, recordingResult: result)
+            p.keyEvents = recordedKeyEvents
             p.modifiedAt = .now
             env.currentProject = p
             onStop()

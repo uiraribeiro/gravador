@@ -121,6 +121,9 @@ final class RecordingSession: NSObject, ObservableObject {
 
     var outputDirectory: URL { sessionDir }
     var cameraPreviewLayer: AVCaptureVideoPreviewLayer { camera.previewLayer }
+    var currentTimelineTime: Double {
+        timelinePosition + (lastResumeAt.map { max(0, Date.now.timeIntervalSince($0)) } ?? 0)
+    }
 
     func attachPreview(view: ScreenBufferView) {
         self.previewView = view

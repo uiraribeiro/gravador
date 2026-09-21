@@ -2,8 +2,7 @@
 //  KeyCastService.swift
 //  GravadorAulas
 //
-//  Captura teclas e atalhos via CGEventTap. Implementação completa
-//  na Etapa 4. Aqui estão o esqueleto e a fila de eventos.
+//  Captura somente atalhos de teclado via CGEventTap.
 //
 //  Requer que o usuário conceda permissão de Acessibilidade em
 //  Preferências do Sistema → Privacidade e Segurança → Acessibilidade.
@@ -15,7 +14,7 @@ import AppKit
 
 final class KeyCastService {
 
-    struct KeyEvent: Equatable {
+    struct KeyEvent: Codable, Equatable {
         let timestamp: TimeInterval
         let display: String  // ex.: "⌘ C"
         let isShortcut: Bool // Cmd/Ctrl/Opt/Shift envolvidos
@@ -23,7 +22,6 @@ final class KeyCastService {
 
     private var tap: CFMachPort?
     private var runLoop: CFRunLoop?
-    private var queue: DispatchQueue?
     private(set) var events: [KeyEvent] = []
     var onEvent: ((KeyEvent) -> Void)?
     private(set) var isRunning: Bool = false
@@ -40,7 +38,7 @@ final class KeyCastService {
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .defaultTap,
+            options: .listenOnly,
             eventsOfInterest: mask,
             callback: { _, _, event, userDataPtr in
                 guard let userDataPtr else { return Unmanaged.passRetained(event) }
@@ -66,6 +64,7 @@ final class KeyCastService {
     func stop() {
         guard let port = tap else { return }
         CGEvent.tapEnable(tap: port, enable: false)
+        CFMachPortInvalidate(port)
         tap = nil
         isRunning = false
         AppLog.keycast.info("keycast parado")
@@ -77,11 +76,12 @@ final class KeyCastService {
         let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
         let flags = event.flags
         let isShortcut = flags.contains(.maskCommand) || flags.contains(.maskControl)
-                         || flags.contains(.maskAlternate) || flags.contains(.maskShift)
         if !isShortcut {
             return Unmanaged.passRetained(event)
         }
-        let display = Self.describe(keyCode: Int(keyCode), flags: flags)
+        guard let display = Self.describe(keyCode: Int(keyCode), flags: flags) else {
+            return Unmanaged.passRetained(event)
+        }
         let now = Date.now.timeIntervalSinceReferenceDate
         let e = KeyEvent(timestamp: now, display: display, isShortcut: true)
         events.append(e)
@@ -89,8 +89,8 @@ final class KeyCastService {
         return Unmanaged.passRetained(event)
     }
 
-    static func describe(keyCode: Int, flags: CGEventFlags) -> String {
-        // Subset mínimo de descrições; a versão completa da Etapa 4 amplia.
+    static func describe(keyCode: Int, flags: CGEventFlags) -> String? {
+        // Códigos desconhecidos nunca são exibidos para evitar vazar digitação.
         var s = ""
         if flags.contains(.maskControl) { s += "⌃ " }
         if flags.contains(.maskAlternate) { s += "⌥ " }
@@ -126,7 +126,7 @@ final class KeyCastService {
         case 124: keyChar = "→"
         case 125: keyChar = "↓"
         case 126: keyChar = "↑"
-        default: keyChar = "[\(keyCode)]"
+        default: return nil
         }
         s += keyChar
         return s

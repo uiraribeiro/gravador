@@ -116,9 +116,19 @@ final class Exporter: ObservableObject {
             let allAnnotations = project?.timeline.tracks.flatMap(\.clips).flatMap(\.annotations) ?? []
             let allEffects = project?.timeline.tracks.flatMap(\.clips).flatMap(\.effects) ?? []
             let allPrivacy = project?.privacyRegions ?? []
+            let keyEvents: [KeyCastService.KeyEvent] = (project?.keyEvents ?? []).compactMap { event in
+                guard event.timestamp >= 0 && event.timestamp <= duration else { return nil }
+                var removedBefore = 0.0
+                for (start, end) in merged {
+                    if event.timestamp >= start && event.timestamp < end { return nil }
+                    if end <= event.timestamp { removedBefore += end - start }
+                }
+                return KeyCastService.KeyEvent(timestamp: event.timestamp - removedBefore,
+                                                display: event.display, isShortcut: true)
+            }
             let needsCustomCompositor = !allPrivacy.isEmpty
                 || allEffects.contains(where: { $0.kind == .blur || $0.kind == .pixelate || $0.kind == .solidBar })
-                || !allAnnotations.isEmpty
+                || !allAnnotations.isEmpty || !keyEvents.isEmpty
 
             if needsCustomCompositor {
                 let videoTracks = composed.composition.tracks(withMediaType: .video)
@@ -132,7 +142,7 @@ final class Exporter: ObservableObject {
                     frameDuration: composed.videoComposition?.frameDuration ?? CMTime(value: 1, timescale: 30),
                     totalDuration: composed.duration,
                     privacyRegions: allPrivacy,
-                    keyEvents: [],
+                    keyEvents: keyEvents,
                     cursorSamples: [],
                     annotations: allAnnotations,
                     trackKindForInstruction: .screen,

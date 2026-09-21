@@ -283,6 +283,15 @@ Sem isso, o app continua tentando acessar a tela sem autorização e o sistema r
                 }
                 .frame(width: 140)
             }
+            Toggle("Mostrar atalhos de teclado no vídeo", isOn: $env.sourceConfig.showKeyCast)
+            if env.sourceConfig.showKeyCast {
+                Text("Registra apenas atalhos com ⌘ ou ⌃. A digitação comum não é gravada. Requer permissão de Acessibilidade.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Abrir ajustes de Acessibilidade") {
+                    permissions.requestAccessibility()
+                }
+                .controlSize(.small)
+            }
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .underPageBackgroundColor)))

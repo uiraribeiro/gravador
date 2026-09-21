@@ -381,8 +381,8 @@ struct EditorView: View {
                 }
 
                 Section("Visualização de teclas") {
-                    if env.keycast.isRunning {
-                        Label("Capturando", systemImage: "keyboard.fill")
+                    if let count = env.currentProject?.keyEvents?.count, count > 0 {
+                        Label("\(count) atalhos no vídeo", systemImage: "keyboard.fill")
                             .foregroundStyle(.green)
                     } else {
                         Label("Desligado", systemImage: "keyboard")

@@ -53,6 +53,7 @@ struct Project: Codable, Equatable {
     var privacyRegions: [PrivacyRegion]
     var removedRanges: [RemovedRange]? = []
     var transcriptionSegments: [TranscriptionSegment]? = nil
+    var keyEvents: [KeyCastService.KeyEvent]? = nil
     var introOutroTemplate: IntroOutroTemplate?
 
     static func empty(name: String) -> Project {
