@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>pt-BR</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Gravador de Aulas</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.education</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSMainStoryboardFile</key>
+    <string></string>
+
+    <!-- Permissões TCC (necessárias antes do primeiro uso) -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>O Gravador de Aulas precisa acessar o microfone para gravar a voz do professor.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>O Gravador de Aulas precisa acessar a câmera para mostrar a webcam sobre a gravação da tela.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>O Gravador de Aulas precisa capturar a tela (e opcionalmente o áudio do sistema) para gravar a videoaula.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>O Gravador de Aulas usa reconhecimento de fala para gerar a transcrição e legendas da sua aula, preferencialmente no dispositivo.</string>
+
+    <!-- Localização principal -->
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>pt-BR</string>
+        <string>en</string>
+    </array>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>pt-BR</string>
+
+    <!-- Modo escuro/claro automático -->
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+
+    <!-- Tamanho mínimo de janela -->
+    <key>NSSupportsAutomaticTermination</key>
+    <false/>
+    <key>NSSupportsSuddenTermination</key>
+    <false/>
+</dict>
+</plist>

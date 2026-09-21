@@ -1,0 +1,625 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B0000000000000000000001 /* ScreenCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001 /* ScreenCaptureService.swift */; };
+		B0000000000000000000002 /* CameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000002 /* CameraService.swift */; };
+		B0000000000000000000003 /* MicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003 /* MicService.swift */; };
+		B0000000000000000000004 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004 /* RecordingSession.swift */; };
+		B0000000000000000000005 /* DeviceDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000005 /* DeviceDiscovery.swift */; };
+		B0000000000000000000006 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000006 /* ProjectStore.swift */; };
+		B0000000000000000000007 /* Compositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000007 /* Compositor.swift */; };
+		B00000000000000000000P31 /* CustomCompositor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P31 /* CustomCompositor.swift */; };
+		B0000000000000000000008 /* Exporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000008 /* Exporter.swift */; };
+		B0000000000000000000009 /* Transcriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009 /* Transcriber.swift */; };
+		B000000000000000000000A /* GravadorAulasApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A /* GravadorAulasApp.swift */; };
+		B000000000000000000000B /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B /* AppEnvironment.swift */; };
+		B000000000000000000000C /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C /* Project.swift */; };
+		B000000000000000000000D /* Timeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D /* Timeline.swift */; };
+		B000000000000000000000E /* SourceConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E /* SourceConfig.swift */; };
+		B000000000000000000000F /* ExportPreset.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F /* ExportPreset.swift */; };
+		B000000000000000000000G /* TimelineBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000G /* TimelineBuilder.swift */; };
+		B000000000000000000000H /* Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000H /* Effects.swift */; };
+		B00000000000000000000P10 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P10 /* ContentView.swift */; };
+		B00000000000000000000P11 /* SourceSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P11 /* SourceSelectionView.swift */; };
+		B00000000000000000000P12 /* DevicePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P12 /* DevicePickerView.swift */; };
+		B00000000000000000000P13 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P13 /* RecordingView.swift */; };
+		B00000000000000000000P14 /* LevelMetersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P14 /* LevelMetersView.swift */; };
+		B00000000000000000000P30 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P30 /* MenuBarController.swift */; };
+		B00000000000000000000P15 /* EditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P15 /* EditorView.swift */; };
+		B00000000000000000000P16 /* TranscriptionPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P16 /* TranscriptionPanelView.swift */; };
+		B00000000000000000000P17 /* ChaptersPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P17 /* ChaptersPanelView.swift */; };
+		B00000000000000000000P18 /* PrivacyRegionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P18 /* PrivacyRegionsView.swift */; };
+		B00000000000000000000P19 /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P19 /* ExportSheetView.swift */; };
+		B00000000000000000000P1A /* PresetEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1A /* PresetEditorView.swift */; };
+		B00000000000000000000P1B /* Permissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1B /* Permissions.swift */; };
+		B00000000000000000000P1C /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1C /* Logger.swift */; };
+		B00000000000000000000P1D /* CMTimeFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1D /* CMTimeFormatting.swift */; };
+		B00000000000000000000P1E /* PreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1E /* PreviewViews.swift */; };
+		B00000000000000000000P1F /* KeyCastService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P1F /* KeyCastService.swift */; };
+		B00000000000000000000P20 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000P20 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A0000000000000000000001 /* ScreenCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureService.swift; sourceTree = "<group>"; };
+		A0000000000000000000002 /* CameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraService.swift; sourceTree = "<group>"; };
+		A0000000000000000000003 /* MicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicService.swift; sourceTree = "<group>"; };
+		A0000000000000000000004 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
+		A0000000000000000000005 /* DeviceDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiscovery.swift; sourceTree = "<group>"; };
+		A0000000000000000000006 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
+		A0000000000000000000007 /* Compositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Compositor.swift; sourceTree = "<group>"; };
+		A0000000000000000000P31 /* CustomCompositor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomCompositor.swift; sourceTree = "<group>"; };
+		A0000000000000000000008 /* Exporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exporter.swift; sourceTree = "<group>"; };
+		A0000000000000000000009 /* Transcriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transcriber.swift; sourceTree = "<group>"; };
+		A000000000000000000000A /* GravadorAulasApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GravadorAulasApp.swift; sourceTree = "<group>"; };
+		A000000000000000000000B /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
+		A000000000000000000000C /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		A000000000000000000000D /* Timeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Timeline.swift; sourceTree = "<group>"; };
+		A000000000000000000000E /* SourceConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceConfig.swift; sourceTree = "<group>"; };
+		A000000000000000000000F /* ExportPreset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreset.swift; sourceTree = "<group>"; };
+		A000000000000000000000G /* TimelineBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineBuilder.swift; sourceTree = "<group>"; };
+		A000000000000000000000H /* Effects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Effects.swift; sourceTree = "<group>"; };
+		A0000000000000000000P10 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P11 /* SourceSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceSelectionView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P12 /* DevicePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePickerView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P13 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P14 /* LevelMetersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelMetersView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P30 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
+		A0000000000000000000P15 /* EditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P16 /* TranscriptionPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionPanelView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P17 /* ChaptersPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChaptersPanelView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P18 /* PrivacyRegionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyRegionsView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P19 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1A /* PresetEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetEditorView.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1B /* Permissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Permissions.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1C /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1D /* CMTimeFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CMTimeFormatting.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1E /* PreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewViews.swift; sourceTree = "<group>"; };
+		A0000000000000000000P1F /* KeyCastService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCastService.swift; sourceTree = "<group>"; };
+		A0000000000000000000P20 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A0000000000000000000P21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A0000000000000000000P22 /* GravadorAulas.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GravadorAulas.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D0000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C0000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				C0000000000000000000002 /* App */,
+				C0000000000000000000003 /* Core */,
+				C0000000000000000000010 /* UI */,
+				C0000000000000000000011 /* Utilities */,
+				C0000000000000000000012 /* Resources */,
+				C0000000000000000000013 /* Products */,
+			);
+			path = GravadorAulas;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000000000000A /* GravadorAulasApp.swift */,
+				A000000000000000000000B /* AppEnvironment.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000003 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				C0000000000000000000004 /* Models */,
+				C0000000000000000000005 /* Capture */,
+				C0000000000000000000006 /* Project */,
+				C0000000000000000000007 /* Timeline */,
+				C0000000000000000000008 /* Effects */,
+				C0000000000000000000009 /* Transcription */,
+				C000000000000000000000A /* Export */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000000000000C /* Project.swift */,
+				A000000000000000000000D /* Timeline.swift */,
+				A000000000000000000000E /* SourceConfig.swift */,
+				A000000000000000000000F /* ExportPreset.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000005 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000001 /* ScreenCaptureService.swift */,
+				A0000000000000000000002 /* CameraService.swift */,
+				A0000000000000000000003 /* MicService.swift */,
+				A0000000000000000000004 /* RecordingSession.swift */,
+				A0000000000000000000005 /* DeviceDiscovery.swift */,
+				A0000000000000000000P1F /* KeyCastService.swift */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000006 /* Project */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000006 /* ProjectStore.swift */,
+			);
+			path = Project;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000007 /* Timeline */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000000000000G /* TimelineBuilder.swift */,
+			);
+			path = Timeline;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000008 /* Effects */ = {
+			isa = PBXGroup;
+			children = (
+				A000000000000000000000H /* Effects.swift */,
+			);
+			path = Effects;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000009 /* Transcription */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000009 /* Transcriber.swift */,
+			);
+			path = Transcription;
+			sourceTree = "<group>";
+		};
+		C000000000000000000000A /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000007 /* Compositor.swift */,
+				A0000000000000000000P31 /* CustomCompositor.swift */,
+				A0000000000000000000008 /* Exporter.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000010 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P10 /* ContentView.swift */,
+				C0000000000000000000014 /* SourceSelection */,
+				C0000000000000000000015 /* Recording */,
+				C0000000000000000000016 /* Editor */,
+				C0000000000000000000017 /* Transcription */,
+				C0000000000000000000018 /* Chapters */,
+				C0000000000000000000019 /* Effects */,
+				C000000000000000000001A /* Export */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000011 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P1B /* Permissions.swift */,
+				A0000000000000000000P1C /* Logger.swift */,
+				A0000000000000000000P1D /* CMTimeFormatting.swift */,
+				A0000000000000000000P1E /* PreviewViews.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000012 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P20 /* Assets.xcassets */,
+				A0000000000000000000P21 /* Info.plist */,
+				A0000000000000000000P22 /* GravadorAulas.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000013 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000014 /* SourceSelection */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P11 /* SourceSelectionView.swift */,
+				A0000000000000000000P12 /* DevicePickerView.swift */,
+			);
+			path = SourceSelection;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000015 /* Recording */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P13 /* RecordingView.swift */,
+				A0000000000000000000P14 /* LevelMetersView.swift */,
+				A0000000000000000000P30 /* MenuBarController.swift */,
+			);
+			path = Recording;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000016 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P15 /* EditorView.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000017 /* Transcription */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P16 /* TranscriptionPanelView.swift */,
+			);
+			path = Transcription;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000018 /* Chapters */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P17 /* ChaptersPanelView.swift */,
+			);
+			path = Chapters;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000019 /* Effects */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P18 /* PrivacyRegionsView.swift */,
+			);
+			path = Effects;
+			sourceTree = "<group>";
+		};
+		C000000000000000000001A /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000P19 /* ExportSheetView.swift */,
+				A0000000000000000000P1A /* PresetEditorView.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E0000000000000000000002 /* GravadorAulas */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0000000000000000000002 /* Build configuration list for PBXNativeTarget "GravadorAulas" */;
+			buildPhases = (
+				D0000000000000000000001 /* Sources */,
+				D0000000000000000000002 /* Resources */,
+				D0000000000000000000003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GravadorAulas;
+			productName = GravadorAulas;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E0000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					E0000000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = F0000000000000000000001 /* Build configuration list for PBXProject "GravadorAulas" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = "pt-BR";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				"pt-BR",
+			);
+			mainGroup = C0000000000000000000001;
+			productRefGroup = C0000000000000000000013 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E0000000000000000000002 /* GravadorAulas */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D0000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B00000000000000000000P20 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D0000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B000000000000000000000A /* GravadorAulasApp.swift in Sources */,
+				B000000000000000000000B /* AppEnvironment.swift in Sources */,
+				B000000000000000000000C /* Project.swift in Sources */,
+				B000000000000000000000D /* Timeline.swift in Sources */,
+				B000000000000000000000E /* SourceConfig.swift in Sources */,
+				B000000000000000000000F /* ExportPreset.swift in Sources */,
+				B0000000000000000000001 /* ScreenCaptureService.swift in Sources */,
+				B0000000000000000000002 /* CameraService.swift in Sources */,
+				B0000000000000000000003 /* MicService.swift in Sources */,
+				B0000000000000000000004 /* RecordingSession.swift in Sources */,
+				B0000000000000000000005 /* DeviceDiscovery.swift in Sources */,
+				B0000000000000000000006 /* ProjectStore.swift in Sources */,
+				B0000000000000000000007 /* Compositor.swift in Sources */,
+				B00000000000000000000P31 /* CustomCompositor.swift in Sources */,
+				B0000000000000000000008 /* Exporter.swift in Sources */,
+				B0000000000000000000009 /* Transcriber.swift in Sources */,
+				B000000000000000000000G /* TimelineBuilder.swift in Sources */,
+				B000000000000000000000H /* Effects.swift in Sources */,
+				B00000000000000000000P10 /* ContentView.swift in Sources */,
+				B00000000000000000000P11 /* SourceSelectionView.swift in Sources */,
+				B00000000000000000000P12 /* DevicePickerView.swift in Sources */,
+				B00000000000000000000P13 /* RecordingView.swift in Sources */,
+				B00000000000000000000P14 /* LevelMetersView.swift in Sources */,
+				B00000000000000000000P30 /* MenuBarController.swift in Sources */,
+				B00000000000000000000P15 /* EditorView.swift in Sources */,
+				B00000000000000000000P16 /* TranscriptionPanelView.swift in Sources */,
+				B00000000000000000000P17 /* ChaptersPanelView.swift in Sources */,
+				B00000000000000000000P18 /* PrivacyRegionsView.swift in Sources */,
+				B00000000000000000000P19 /* ExportSheetView.swift in Sources */,
+				B00000000000000000000P1A /* PresetEditorView.swift in Sources */,
+				B00000000000000000000P1B /* Permissions.swift in Sources */,
+				B00000000000000000000P1C /* Logger.swift in Sources */,
+				B00000000000000000000P1D /* CMTimeFormatting.swift in Sources */,
+				B00000000000000000000P1E /* PreviewViews.swift in Sources */,
+				B00000000000000000000P1F /* KeyCastService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = BDNP6MAV95;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = BDNP6MAV95;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		F0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GravadorAulas/Resources/GravadorAulas.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GravadorAulas/Resources/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gravadoraulas.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GravadorAulas/Resources/GravadorAulas.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_ASSET_PATHS = "";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = GravadorAulas/Resources/Info.plist;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = "$(RECOMMENDED_MACOSX_DEPLOYMENT_TARGET)";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gravadoraulas.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F0000000000000000000001 /* Build configuration list for PBXProject "GravadorAulas" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0000000000000000000003 /* Debug */,
+				F0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0000000000000000000002 /* Build configuration list for PBXNativeTarget "GravadorAulas" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0000000000000000000005 /* Debug */,
+				F0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E0000000000000000000000 /* Project object */;
+}
